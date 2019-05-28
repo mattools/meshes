@@ -74,21 +74,13 @@ methods (Static)
             [x1 y1 repmat(z1, [5 1])]; ...
             [x2 y2 repmat(z1+z2, [5 1])]; ...
             0 0 2*z1+z2];
-        edges = [...
-            1 2;1 3;1 4;1 5;1 6; ...
-            2 3;3 4;4 5;5 6;6 2; ...
-            2 7;7 3;3 8;8 4;4 9;9 5;5 10;10 6;6 11;11 2; ...
-            7 8;8 9;9 10;10 11;11 7; ...
-            7 12;8 12;9 12;10 12;11 12];
         % faces are ordered to have normals pointing outside of the mesh
         faces = [...
             1 3  2 ; 1 4  3 ; 1  5  4 ;  1  6  5 ;  1 2  6;...
             2 3  7 ; 3 4  8 ; 4  5  9 ;  5  6 10 ;  6 2 11;...
             7 3  8 ; 8 4  9 ; 9  5 10 ; 10  6 11 ; 11 2  7;...
             7 8 12 ; 8 9 12 ; 9 10 12 ; 10 11 12 ; 11 7 12];
-
         obj = GenericTriMesh(vertices, faces);
-        obj.Edges = edges;
     end
 end % end methods
 
@@ -107,6 +99,174 @@ methods
     end
 
 end % end constructors
+
+
+%% High-level processing
+methods
+   
+    function res = smooth(obj, varargin)
+
+        % determine number of iterations
+        nIter = 1;
+        if ~isempty(varargin)
+            nIter = varargin{1};
+        end
+
+        % compute adjacency matrix,
+        % result is a Nv-by-Nv matrix with zeros on the diagonal
+        adj = adjacencyMatrix(obj);
+
+        % ensure the size of the matrix is Nv-by-Nv
+        % (this can not be the case if some vertices are not referenced)
+        nv = vertexNumber(obj);
+        if size(adj, 1) < nv
+            adj(nv, nv) = 0;
+        end
+
+        % Add "self adjacencies"
+        adj = adj + speye(nv);
+
+        % weight each vertex by the number of its neighbors
+        w = spdiags(full(sum(adj, 2).^(-1)), 0, nv, nv);
+        adj = w * adj;
+
+        % do averaging to smooth the field
+        v2 = obj.Vertices;
+        for k = 1:nIter
+            v2 = adj * v2;
+        end
+        
+        % create a new mesh with same faces
+        res = GenericTriMesh(v2, obj.Faces);
+    end
+
+    function res = subdivide(obj, n)
+        
+        % compute the edge array
+        ensureValidEdges(obj);
+        ensureValidFaceEdges(obj);
+        
+        % initialise the array of new vertices
+        vertices2 = obj.Vertices;
+        
+        % several interpolated positions
+        t = linspace(0, 1, n + 1)';
+        coef2 = t(2:end-1);
+        coef1 = 1 - t(2:end-1);
+        
+        % keep an array containing index of new vertices for each original edge
+        nEdges = edgeNumber(obj);
+        edgeNewVertexIndices = zeros(nEdges, n-1);
+        
+        % create new vertices on each edge
+        for iEdge = 1:nEdges
+            % extract each extremity as a point
+            v1 = obj.Vertices(obj.Edges(iEdge, 1), :);
+            v2 = obj.Vertices(obj.Edges(iEdge, 2), :);
+            % compute new points
+            newPoints = coef1 * v1 + coef2 * v2;
+            % add new vertices, and keep their indices
+            edgeNewVertexIndices(iEdge,:) = size(vertices2, 1) + (1:n-1);
+            vertices2 = [vertices2 ; newPoints]; %#ok<AGROW>
+        end
+        
+        faces2 = zeros(0, 3);
+        nFaces = faceNumber(obj);
+        for iFace = 1:nFaces
+            % compute index of each corner vertex
+            face = obj.Faces(iFace, :);
+            iv1 = face(1);
+            iv2 = face(2);
+            iv3 = face(3);
+            
+            % compute index of each edge
+%             faceEdges = obj.FaceEdges(iFace, :);
+            ie1 = obj.FaceEdges(iFace, 1);
+            ie2 = obj.FaceEdges(iFace, 2);
+            ie3 = obj.FaceEdges(iFace, 3);
+            
+            % indices of new vertices on edges
+            edge1NewVertexIndices = edgeNewVertexIndices(ie1, :);
+            edge2NewVertexIndices = edgeNewVertexIndices(ie2, :);
+            edge3NewVertexIndices = edgeNewVertexIndices(ie3, :);
+            
+            % keep vertex 1 as reference for edges 1 and 3
+            if obj.Edges(ie1, 1) ~= iv1
+                edge1NewVertexIndices = edge1NewVertexIndices(end:-1:1);
+            end
+            if obj.Edges(ie3, 1) ~= iv1
+                edge3NewVertexIndices = edge3NewVertexIndices(end:-1:1);
+            end
+            
+            % create the first new face, on 'top' of the original face
+            topVertexInds = [edge1NewVertexIndices(1) edge3NewVertexIndices(1)];
+            newFace = [iv1 topVertexInds];
+            faces2 = [faces2; newFace]; %#ok<AGROW>
+            
+            % iterate over middle strips
+            for iStrip = 2:n-1
+                % index of extreme vertices of current row
+                ivr1 = edge1NewVertexIndices(iStrip);
+                ivr2 = edge3NewVertexIndices(iStrip);
+                
+                % extreme vertices as points
+                v1 = vertices2(ivr1, :);
+                v2 = vertices2(ivr2, :);
+                
+                % create additional vertices within the bottom row of the strip
+                t = linspace(0, 1, iStrip+1)';
+                coef2 = t(2:end-1);
+                coef1 = 1 - t(2:end-1);
+                newPoints = coef1 * v1 + coef2 * v2;
+                
+                % compute indices of new vertices in result array
+                newInds = size(vertices2, 1) + (1:iStrip-1);
+                botVertexInds = [ivr1 newInds ivr2];
+                
+                % add new vertices
+                vertices2 = [vertices2 ; newPoints]; %#ok<AGROW>
+                
+                % create top faces of current strip
+                for k = 1:iStrip-1
+                    newFace = [topVertexInds(k) botVertexInds(k+1) topVertexInds(k+1)];
+                    faces2 = [faces2; newFace]; %#ok<AGROW>
+                end
+                
+                % create bottom faces of current strip
+                for k = 1:iStrip
+                    newFace = [topVertexInds(k) botVertexInds(k) botVertexInds(k+1)];
+                    faces2 = [faces2; newFace]; %#ok<AGROW>
+                end
+                
+                % bottom vertices of current strip are top vertices of next strip
+                topVertexInds = botVertexInds;
+            end
+            
+            % for edge 2, keep vertex 2 of the current face as reference
+            if obj.Edges(ie2, 1) ~= iv2
+                edge2NewVertexIndices = edge2NewVertexIndices(end:-1:1);
+            end
+            
+            % consider new vertices together with extremities
+            botVertexInds = [iv2 edge2NewVertexIndices iv3];
+            
+            % create top faces for last strip
+            for k = 1:n-1
+                newFace = [topVertexInds(k) botVertexInds(k+1) topVertexInds(k+1)];
+                faces2 = [faces2; newFace]; %#ok<AGROW>
+            end
+            
+            % create bottom faces for last strip
+            for k = 1:n
+                newFace = [topVertexInds(k) botVertexInds(k) botVertexInds(k+1)];
+                faces2 = [faces2; newFace]; %#ok<AGROW>
+            end
+        end
+        
+        res = GenericTriMesh(vertices2, faces2);
+    end
+end
+
 
 %% topology management
 methods
@@ -188,6 +348,24 @@ methods
         % Removes a face. This resets topological properties.
         obj.Faces(faceIndex, :) = [];
         clearEdges(obj);
+    end
+    
+    function adj = adjacencyMatrix(obj)
+
+        % forces faces to be floating point array, for sparse function
+        faces = obj.Faces;
+        if ~isfloat(faces)
+            faces = double(faces);
+        end
+        
+        % populate a sparse matrix
+        adj = sparse(...
+            [faces(:,1); faces(:,1); faces(:,2); faces(:,2); faces(:,3); faces(:,3)], ...
+            [faces(:,3); faces(:,2); faces(:,1); faces(:,3); faces(:,2); faces(:,1)], ...
+            1.0);
+        
+        % remove double adjacencies
+        adj = min(adj, 1);
     end
 end
 
