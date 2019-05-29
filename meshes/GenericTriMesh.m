@@ -180,7 +180,6 @@ methods
             iv3 = face(3);
             
             % compute index of each edge
-%             faceEdges = obj.FaceEdges(iFace, :);
             ie1 = obj.FaceEdges(iFace, 1);
             ie2 = obj.FaceEdges(iFace, 2);
             ie3 = obj.FaceEdges(iFace, 3);
@@ -325,6 +324,22 @@ methods
     function nv = vertexNumber(obj)
         nv = size(obj.Vertices, 1);
     end
+    
+    function ind = addVertex(obj, position)
+        if any(size(position) ~= [1 3])
+            error('Require a 1-by-3 array of coordinates as input argument');
+        end
+        obj.Vertices = [obj.Vertices ; position];
+        ind = size(obj.Vertices, 1);
+
+        % optionnally updates topological data structures
+        if ~isempty(obj.VertexEdges)
+            obj.VertexEdges{ind} = [];
+        end
+        if ~isempty(obj.VertexFaces)
+            obj.VertexFaces{ind} = [];
+        end
+    end
 end
 
 %% Edge management methods
@@ -332,9 +347,32 @@ methods
     function ne = edgeNumber(obj)
         % ne = edgeNumber(mesh)
         if isempty(obj.Edges)
-            computeEdgeVertices(obj);
+            computeEdges(obj);
         end
         ne = size(obj.Edges, 1);
+    end
+    
+    function ind = addEdge(obj, edgeVertices)
+        % Adds an edge given vertex indices and return new edge index
+        edge = sort(edgeVertices, 2); v1 = edge(1); v2 = edge(2);
+        if ~isempty(obj.Edges)
+            if ~isempty(find(obj.Edges(:,1) == v1 & obj.Edges(:,2) == v2, 1))
+                error('Edge is already into mesh');
+            end
+        end
+        obj.Edges = [obj.Edges; edge];
+        ind = size(obj.Edges, 1);
+        
+        % optionnally add edge index to vertices
+        if ~isempty(obj.VertexEdges)
+            obj.VertexEdges{v1} = [obj.VertexEdges{v1} ind];
+            obj.VertexEdges{v2} = [obj.VertexEdges{v2} ind];
+        end
+        
+        % optionnally create empty list of faces for this edge
+        if ~isempty(obj.EdgeFaces)
+            obj.EdgeFaces{ind} = [];
+        end
     end
 end
 
@@ -344,9 +382,53 @@ methods
         nf = size(obj.Faces, 1);
     end
     
+    function indFace = addFace(obj, vertexInds)
+        % Adds a face given 3 vertex indices and return new face index
+        
+        if any(size(vertexInds) ~= [1 3])
+            error('Require an array of three indices as input argument');
+        end
+        obj.Faces = [obj.Faces ; vertexInds];
+        indFace = size(obj.Faces, 1);
+
+        % optionnaly updates vertex faces
+        if ~isempty(obj.VertexFaces)
+            obj.VertexFaces{face(1)} = [obj.VertexFaces{face(1)} ind];
+            obj.VertexFaces{face(2)} = [obj.VertexFaces{face(2)} ind];
+            obj.VertexFaces{face(3)} = [obj.VertexFaces{face(3)} ind];
+        end
+        
+        % optionnaly updates edges
+        if ~isempty(obj.Edges)
+            newEdges = sort(vertexInds([1 2; 2 3;1 3]), 2);
+            edgeInds = zeros(1,3);
+            
+            for iEdge = 1:3
+                v1 = newEdges(iEdge, 1);
+                v2 = newEdges(iEdge, 2);
+                edgeInd = find(obj.Edges(:,1) == v1 & obj.Edges(:,2) == v2);
+                if isempty(edgeInd)
+                    edgeInd = addEdge(obj, [v1 v2]);
+                end
+                edgeInds(iEdge) = edgeInd;
+            end
+            
+            if ~isempty(obj.FaceEdges)
+                obj.FaceEdges(indFace, :) = edgeInds;
+            end
+            if ~isempty(obj.EdgeFaces)
+                obj.EdgeFaces{edgeInds(1)} = [obj.EdgeFaces{edgeInds(1)} ind];
+                obj.EdgeFaces{edgeInds(2)} = [obj.EdgeFaces{edgeInds(2)} ind];
+                obj.EdgeFaces{edgeInds(3)} = [obj.EdgeFaces{edgeInds(3)} ind];
+            end
+        end
+    end
+    
     function removeFace(obj, faceIndex)
         % Removes a face. This resets topological properties.
         obj.Faces(faceIndex, :) = [];
+        
+        % TODO: update edges instead of clearing
         clearEdges(obj);
     end
     
@@ -384,11 +466,11 @@ methods
     
     function ensureValidEdges(obj)
         if isempty(obj.Edges)
-            computeEdgeVertices(obj);
+            computeEdges(obj);
         end
     end
     
-    function computeEdgeVertices(obj)
+    function computeEdges(obj)
         % updates the property "Edges"
         
         % compute total number of edges
