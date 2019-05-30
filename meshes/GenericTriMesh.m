@@ -284,9 +284,32 @@ methods
             newEdges(i) = find(vertexInds == newEdges(i), 1);
         end
         
+        % create the resulting mesh
         res = GenericTriMesh();
         res.Vertices = newVertices;
         res.Edges = newEdges;
+    end
+    
+    function polyList = vertexLinkPolygons(obj, vertexIndex)
+        linkMesh = vertexLink(obj, vertexIndex);
+
+        edges = linkMesh.Edges;
+        polyList = cell(0, 0);
+        while ~isempty(edges)
+            v0 = edges(1,1);
+            v1 = edges(1,2);
+            edges(1,:) = [];
+
+            poly = linkMesh.Vertices(v0, :);
+            while v1 ~= v0
+                poly = [poly ; linkMesh.Vertices(v1, :)]; %#ok<AGROW>
+                indEdge = sum(edges == v1, 2) > 0;
+                edge = edges(indEdge, :);
+                edges(indEdge,:) = [];
+                v1 = edge(edge ~= v1);
+            end
+            polyList = [polyList {poly}]; %#ok<AGROW>
+        end
     end
 end
 
@@ -340,6 +363,37 @@ methods
         
         % check if some faces are border
         b2 = any(borderFaces);
+    end
+    
+    function res = boundary(obj)
+        
+        edgeInds = boundaryEdges(obj);
+        
+        vertexInds = unique(obj.Edges(edgeInds, :));
+        
+        newVertices = obj.Vertices(vertexInds, :);
+        
+        % find index of edges belonging to the new complex
+        linkEdgeInds = sum(ismember(obj.Edges, vertexInds), 2) == 2;
+        newEdges = obj.Edges(linkEdgeInds, :);
+        for i = 1:numel(newEdges)
+            newEdges(i) = find(vertexInds == newEdges(i), 1);
+        end
+        
+        % create the resulting mesh
+        res = GenericTriMesh();
+        res.Vertices = newVertices;
+        res.Edges = newEdges;
+    end
+    
+    function inds = boundaryEdges(obj)
+        % finds index of boundary edgeq
+        
+        ensureValidEdges(obj);
+        ensureValidEdgeFaces(obj);
+   
+        % identifies edges adjacent to exactly 1 face.
+        inds = find(cellfun(@(x) length(x) == 1, obj.EdgeFaces));
     end
 end
 
@@ -610,14 +664,16 @@ end % end methods
 %% Methods mimicking Geometry interface
 methods
     function box = boundingBox(obj)
-        % Returns the bounding box of this shape
+        % Returns the bounding box of this shape.
         mini = min(obj.Vertices);
         maxi = max(obj.Vertices);
         box = Box3D([mini(1) maxi(1) mini(2) maxi(2) mini(3) maxi(3)]);
     end
     
     function h = draw(varargin)
-        % Draw the current geometry, eventually specifying the style
+        % Draw the faces of this mesh, using the patch function.
+        % see also
+        %   drawEdges
         
         % extract handle of axis to draw in
         if numel(varargin{1}) == 1 && ishghandle(varargin{1}, 'axes')
@@ -646,6 +702,49 @@ methods
         h = patch('Parent', hAx, ...
             'vertices', obj.Vertices, 'faces', obj.Faces, ...
             options{:} );
+
+        % optionnally add style processing
+        if ~isempty(varargin) && isa(varargin{1}, 'Style')
+            apply(varargin{1}, hh);
+        end
+                
+        if nargout > 0
+            h = hh;
+        end
+    end
+    
+    function h = drawEdges(varargin)
+        % Draw the edges of this complex
+        
+        % extract handle of axis to draw in
+        if numel(varargin{1}) == 1 && ishghandle(varargin{1}, 'axes')
+            hAx = varargin{1};
+            varargin(1) = [];
+        else
+            hAx = gca;
+        end
+
+        % extract the point instance from the list of input arguments
+        obj = varargin{1};
+        varargin(1) = [];
+        
+        % add default drawing options
+        options = {'Color', [0 0 0]};
+
+        % extract optional drawing options
+        if nargin > 1 && ischar(varargin{1})
+            if nargin > 2
+                options = [options varargin];
+            else
+                options = varargin;
+            end
+        end
+        
+        % Draw 3D edges
+        x = [obj.Vertices(obj.Edges(:,1), 1) obj.Vertices(obj.Edges(:,2), 1)]';
+        y = [obj.Vertices(obj.Edges(:,1), 2) obj.Vertices(obj.Edges(:,2), 2)]';
+        z = [obj.Vertices(obj.Edges(:,1), 3) obj.Vertices(obj.Edges(:,2), 3)]';
+        hh = plot3(hAx, x, y, z, options{:});
 
         % optionnally add style processing
         if ~isempty(varargin) && isa(varargin{1}, 'Style')
