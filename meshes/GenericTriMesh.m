@@ -267,6 +267,30 @@ methods
 end
 
 
+%% Topological queries
+methods
+    function res = vertexLink(obj, vertexIndex)
+        ensureValidEdges(obj);
+        edgeInds = sum(obj.Edges == vertexIndex, 2) > 0;
+        vertexInds = unique(obj.Edges(edgeInds, :));
+        vertexInds(vertexInds == vertexIndex) = [];
+        
+        newVertices = obj.Vertices(vertexInds, :);
+        
+        % find index of edges belonging to the new complex
+        linkEdgeInds = sum(ismember(obj.Edges, vertexInds), 2) == 2;
+        newEdges = obj.Edges(linkEdgeInds, :);
+        for i = 1:numel(newEdges)
+            newEdges(i) = find(vertexInds == newEdges(i), 1);
+        end
+        
+        res = GenericTriMesh();
+        res.Vertices = newVertices;
+        res.Edges = newEdges;
+    end
+end
+
+
 %% topology management
 methods
     function [b1, b2] = isManifold(obj)
