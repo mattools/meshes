@@ -670,6 +670,36 @@ methods
         box = Box3D([mini(1) maxi(1) mini(2) maxi(2) mini(3) maxi(3)]);
     end
     
+    function res = clipVertices(obj, box)
+        
+        % clip the vertices
+        % get bounding box limits
+        xmin = box(1); xmax = box(2);
+        ymin = box(3); ymax = box(4);
+        zmin = box(5); zmax = box(6);
+        
+        % compute indices of points inside visible area
+        xOk = obj.Vertices(:,1) >= xmin & obj.Vertices(:,1) <= xmax;
+        yOk = obj.Vertices(:,2) >= ymin & obj.Vertices(:,2) <= ymax;
+        zOk = obj.Vertices(:,3) >= zmin & obj.Vertices(:,3) <= zmax;
+        
+        % select vertices
+        inds = find(xOk & yOk & zOk);
+        newVertices = obj.Vertices(inds, :);
+        
+        % create index array for face indices relabeling
+        refInds = zeros(size(xOk));
+        for i = 1:length(inds)
+            refInds(inds(i)) = i;
+        end
+        
+        % select the faces with all vertices within the box
+        indFaces = sum(~ismember(obj.Faces, inds), 2) == 0;
+        newFaces = refInds(obj.Faces(indFaces, :));
+        
+        res = GenericTriMesh(newVertices, newFaces);
+    end
+    
     function h = draw(varargin)
         % Draw the faces of this mesh, using the patch function.
         % see also
