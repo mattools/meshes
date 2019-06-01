@@ -688,7 +688,7 @@ methods
         newVertices = obj.Vertices(inds, :);
         
         % create index array for face indices relabeling
-        refInds = zeros(size(xOk));
+        refInds = zeros(1, length(xOk));
         for i = 1:length(inds)
             refInds(inds(i)) = i;
         end
