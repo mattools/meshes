@@ -373,12 +373,19 @@ methods
         
         newVertices = obj.Vertices(vertexInds, :);
         
-        % find index of edges belonging to the new complex
-        linkEdgeInds = sum(ismember(obj.Edges, vertexInds), 2) == 2;
-        newEdges = obj.Edges(linkEdgeInds, :);
+        newEdges = obj.Edges(edgeInds, :);
+
+        % recompute vertex labels
         for i = 1:numel(newEdges)
-            newEdges(i) = find(vertexInds == newEdges(i), 1);
+            newEdges(i) = find(vertexInds == newEdges(i));
         end
+        
+%         % find index of edges belonging to the new complex
+%         linkEdgeInds = sum(ismember(obj.Edges, vertexInds), 2) == 2;
+%         newEdges = obj.Edges(linkEdgeInds, :);
+%         for i = 1:numel(newEdges)
+%             newEdges(i) = find(vertexInds == newEdges(i), 1);
+%         end
         
         % create the resulting mesh
         res = GenericTriMesh();
