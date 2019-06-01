@@ -800,5 +800,25 @@ methods
     
 end % end methods
 
+%% Overload Matlab functions 
+methods
+    function dims = size(obj, varargin)
+        if isempty(varargin)
+            dims = [size(obj.Vertices, 1) size(obj.Edges, 1) size(obj.Faces, 1)];
+        else
+            nd = varargin{1};
+            if nd == 1
+                dims = size(obj.Vertices, 1);
+            elseif nd == 2
+                dims = size(obj.Edges, 1);
+            elseif nd == 3
+                dims = size(obj.Faces, 1);
+            else
+                error('Dimension argument must be between 1 and 3');
+            end
+        end
+    end
+end
+
 end % end classdef
 
