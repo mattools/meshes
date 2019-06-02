@@ -380,13 +380,6 @@ methods
             newEdges(i) = find(vertexInds == newEdges(i));
         end
         
-%         % find index of edges belonging to the new complex
-%         linkEdgeInds = sum(ismember(obj.Edges, vertexInds), 2) == 2;
-%         newEdges = obj.Edges(linkEdgeInds, :);
-%         for i = 1:numel(newEdges)
-%             newEdges(i) = find(vertexInds == newEdges(i), 1);
-%         end
-        
         % create the resulting mesh
         res = GenericTriMesh();
         res.Vertices = newVertices;
@@ -401,6 +394,86 @@ methods
    
         % identifies edges adjacent to exactly 1 face.
         inds = find(cellfun(@(x) length(x) == 1, obj.EdgeFaces));
+    end
+    
+    function res = trimVertices(obj)
+        % removes vertices that do not belong to any face
+        
+        % identify vertices referenced by a face
+        vertexUsed = false(size(obj.Vertices, 1), 1);
+        vertexUsed(unique(obj.Faces(:))) = true;
+        inds = find(vertexUsed);
+        
+        % compute map from old index to new index
+        newInds = zeros(size(obj.Vertices, 1), 1);
+        for iIndex = 1:length(inds)
+            newInds(inds(iIndex)) = iIndex;
+        end
+        
+        % change labels of vertices referenced by faces
+        faces2 = zeros(size(obj.Faces));
+        for i = 1:numel(faces2)
+            faces2(i) = find(inds == obj.Faces(i), 1);
+        end
+        
+        % create new mesh
+        res = GenericTriMesh(obj.Vertices(inds, :), faces2);
+    end
+    
+    function ccList = connectedComponents(obj)
+        % set of edge-connected components
+        
+        ensureValidFaceEdges(obj);
+        ensureValidEdgeFaces(obj);
+
+        nFaces = size(obj.Faces, 1);
+        
+        % associate a component label to each face.
+        %  0 -> not yet assignd
+        % -1 -> invalid face (no vertex associated) 
+        faceLabels = zeros(nFaces, 1);
+        
+        % init
+        currentLabel = 0;
+        ccList = {};
+        
+        while true
+            % find a face without label
+            facesToUpdate = find(faceLabels == 0, 1);
+            
+            if isempty(facesToUpdate)
+                break;
+            end
+            
+            currentLabel = currentLabel + 1;
+
+            while ~isempty(facesToUpdate)
+                indFace = facesToUpdate(1);
+                facesToUpdate(1) = [];
+                
+                faceLabels(indFace) = currentLabel;
+                
+                edgeInds = obj.FaceEdges(indFace, :);
+                for iEdge = 1:length(edgeInds)
+                    faceInds = obj.EdgeFaces{edgeInds(iEdge)};
+                    faceInds(faceInds == indFace) = [];
+                    
+                    % length of faceInds should be 0 or 1 for manifold meshes
+                    % but we keep the loop to manage non-manifold cases 
+                    for iFace = 1:length(faceInds)
+                        if faceLabels(faceInds(iFace)) == 0
+                            facesToUpdate = [facesToUpdate faceInds(iFace)]; %#ok<AGROW>
+                        end
+                    end
+                end
+            end
+            
+            % create new mesh with only necessary vertices and faces
+            newFaces = obj.Faces(faceLabels == currentLabel, :);
+            cc = trimVertices(GenericTriMesh(obj.Vertices, newFaces));
+            ccList = [ccList {cc}]; %#ok<AGROW>
+        end
+        
     end
 end
 
@@ -583,6 +656,8 @@ methods
     function computeFaceEdges(obj)
         % compute face to edge indices array
         % as a Nf-by-3 array (each face connected to exactly three edges)
+        
+        ensureValidEdges(obj);
         
         nFaces = faceNumber(obj);
         obj.FaceEdges = zeros(nFaces, 3);
