@@ -782,6 +782,47 @@ methods
         res = GenericTriMesh(newVertices, newFaces);
     end
     
+    function centroids = faceCentroids(obj)
+        % computes the normals of all faces in the mesh
+        
+        nf = size(obj.Faces, 1);
+        centroids = zeros(nf, 3);
+        % For triangular meshes, uses accelerated method
+        % (taken from https://github.com/alecjacobson/gptoolbox)
+        for ff = 1:3
+            centroids = centroids + obj.Vertices(obj.Faces(:,ff),:) / 3.0;
+        end
+    end
+    
+    function normals = faceNormals(obj)
+
+        % compute vector of first edges
+        v1 = obj.Vertices(obj.Faces(:,1),:);
+        v12 = obj.Vertices(obj.Faces(:,2),:) - v1;
+        v13 = obj.Vertices(obj.Faces(:,3),:) - v1;
+        
+        % compute normals using cross product (vectors have same size)
+        normals = cross(v12, v13, 2);
+    end
+    
+    function normals = vertexNormals(obj)
+        nv = size(obj.Vertices, 1);
+        nf = size(obj.Faces, 1);
+        
+        % unit normals to the faces
+        fNormals = faceNormals(obj);
+        
+        % compute normal of each vertex: sum of normals to each face
+        normals = zeros(nv, 3);
+        for i = 1:nf
+            face = obj.Faces(i, :);
+            for j = 1:length(face)
+                v = face(j);
+                normals(v, :) = normals(v,:) + fNormals(i,:);
+            end
+        end
+    end
+    
     function h = draw(varargin)
         % Draw the faces of this mesh, using the patch function.
         % see also
@@ -865,6 +906,21 @@ methods
                 
         if nargout > 0
             h = hh;
+        end
+    end
+
+    function h = drawFaceNormals(obj, varargin)
+        
+        % compute vector data
+        c = faceCentroids(obj);
+        n = faceNormals(obj);
+        
+        % display an arrow for each normal
+        hq = quiver3(c(:,1), c(:,2), c(:,3), n(:,1), n(:,2), n(:,3));
+        
+        % format output
+        if nargout > 0
+            h = hq;
         end
     end
     
