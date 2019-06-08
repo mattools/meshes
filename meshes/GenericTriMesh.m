@@ -582,6 +582,8 @@ end
 %% Topological queries
 methods
     function res = vertexLink(obj, vertexIndex)
+        % returns the link around the specifid vertex as a new mesh
+        
         ensureValidEdges(obj);
         edgeInds = sum(obj.Edges == vertexIndex, 2) > 0;
         vertexInds = unique(obj.Edges(edgeInds, :));
@@ -603,6 +605,7 @@ methods
     end
     
     function polyList = vertexLinkPolygons(obj, vertexIndex)
+        % returns the link around a vertex as a list of 3D polylines
         linkMesh = vertexLink(obj, vertexIndex);
 
         edges = linkMesh.Edges;
@@ -678,8 +681,9 @@ methods
     end
     
     function res = boundary(obj)
+        % boundary of this mesh as a new mesh (can be empty)
         
-        edgeInds = boundaryEdges(obj);
+        edgeInds = boundaryEdgeIndices(obj);
         
         vertexInds = unique(obj.Edges(edgeInds, :));
         
@@ -698,8 +702,8 @@ methods
         res.Edges = newEdges;
     end
     
-    function inds = boundaryEdges(obj)
-        % finds index of boundary edgeq
+    function inds = boundaryEdgeIndices(obj)
+        % finds boundary edges and returns their indices
         
         ensureValidEdges(obj);
         ensureValidEdgeFaces(obj);
@@ -708,8 +712,8 @@ methods
         inds = find(cellfun(@(x) length(x) == 1, obj.EdgeFaces));
     end
     
-    function res = trimVertices(obj)
-        % removes vertices that do not belong to any face
+    function res = trimmedMesh(obj)
+        % new mesh without empty vertices
         
         % identify vertices referenced by a face
         vertexUsed = false(size(obj.Vertices, 1), 1);
@@ -782,7 +786,7 @@ methods
             
             % create new mesh with only necessary vertices and faces
             newFaces = obj.Faces(faceLabels == currentLabel, :);
-            cc = trimVertices(GenericTriMesh(obj.Vertices, newFaces));
+            cc = trimmedMesh(GenericTriMesh(obj.Vertices, newFaces));
             ccList = [ccList {cc}]; %#ok<AGROW>
         end
         
