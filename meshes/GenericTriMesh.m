@@ -712,6 +712,27 @@ methods
         inds = find(cellfun(@(x) length(x) == 1, obj.EdgeFaces));
     end
     
+    function b = isBoundaryEdge(obj, edgeInd)
+        % checks if the  specified edge is boundary
+        
+        ensureValidEdgeFaces(obj);
+        
+        % returns true if edge is adjacent to exactly one face
+        b = length(obj.EdgeFaces{edgeInd}) == 1;
+    end
+    
+    function b = isBoundaryVertex(obj, vertexInd)
+        % checks if the  specified edge is boundary
+        
+        ensureValidEdgeFaces(obj);
+        ensureValidVertexEdges(obj);
+        
+        % returns true if vertex is adjacent to at least one boundary edge
+        edgeInds = obj.VertexEdges{vertexInd};
+        b = cellfun(@(x) length(x) == 1, obj.EdgeFaces(edgeInds));
+        b = any(b);
+    end
+    
     function res = trimmedMesh(obj)
         % new mesh without empty vertices
         
@@ -1016,6 +1037,7 @@ methods
         %   face located on the right. Some indices may be 0 if the mesh is not
         %   'closed'.
         
+        ensureValidEdges(obj);
         % indices of faces adjacent to each edge
         obj.EdgeFaces = cell(1, edgeNumber(obj));
         
@@ -1054,8 +1076,32 @@ methods
                 obj.EdgeFaces{edgeIndex} = inds;
             end
         end
-        
     end
+    
+    function ensureValidVertexEdges(obj)
+        if isempty(obj.VertexEdges)
+            computeVertexEdges(obj);
+        end
+    end
+    
+    function computeVertexEdges(obj)
+        % updates the property "VertexEdges"
+        ensureValidEdges(obj);
+        
+        nVertices = size(obj.Vertices, 1);
+        obj.VertexEdges = cell(1, nVertices);
+        for iEdge = 1:size(obj.Edges, 1)
+            v1 = obj.Edges(iEdge, 1);
+            inds = obj.VertexEdges{v1};
+            inds = [inds iEdge]; %#ok<AGROW>
+            obj.VertexEdges{v1} = inds;
+            v2 = obj.Edges(iEdge, 2);
+            inds = obj.VertexEdges{v2};
+            inds = [inds iEdge]; %#ok<AGROW>
+            obj.VertexEdges{v2} = inds;
+        end
+    end
+    
 end % end methods
 
 %% Drawing functions
