@@ -1111,46 +1111,15 @@ methods
         % see also
         %   drawEdges
         
-        % extract handle of axis to draw in
-        if numel(varargin{1}) == 1 && ishghandle(varargin{1}, 'axes')
-            hAx = varargin{1};
-            varargin(1) = [];
-        else
-            hAx = gca;
-        end
-
-        % extract the point instance from the list of input arguments
-        obj = varargin{1};
-        varargin(1) = [];
-        
-        % add default drawing options
-        options = {'FaceColor', [.75 .75 .75]};
-
-        % extract optional drawing options
-        if nargin > 1 && ischar(varargin{1})
-            options = [options varargin];
-        end
-        
-        if length(options) == 1
-            options = [{'facecolor', [.75 .75 .75]} options];
-        end
-
-        h = patch('Parent', hAx, ...
-            'vertices', obj.Vertices, 'faces', obj.Faces, ...
-            options{:} );
-
-        % optionnally add style processing
-        if ~isempty(varargin) && isa(varargin{1}, 'Style')
-            apply(varargin{1}, hh);
-        end
+        hh = drawFaces(varargin{:});
                 
         if nargout > 0
             h = hh;
         end
     end
     
-    function h = drawEdges(varargin)
-        % Draw the edges of this complex
+    function h = drawVertices(varargin)
+        % Draw the vertices of this complex
         
         % extract handle of axis to draw in
         if numel(varargin{1}) == 1 && ishghandle(varargin{1}, 'axes')
@@ -1160,26 +1129,38 @@ methods
             hAx = gca;
         end
 
-        % extract the point instance from the list of input arguments
+        % extract the mesh instance from the list of input arguments
         obj = varargin{1};
         varargin(1) = [];
         
         % add default drawing options
-        options = {'Color', [0 0 0]};
+        inds = [];
+        options = {'linestyle', 'none', 'marker', 'o'};
 
         % extract optional drawing options
-        if nargin > 1 && ischar(varargin{1})
-            if nargin > 2
+        if nargin > 1 && isnumeric(varargin{1})
+            % get index of edges to draw
+            inds = varargin{1};
+            varargin(1) = [];
+        end
+        if ~isempty(varargin) && ischar(varargin{1})
+            if length(varargin) > 1
                 options = [options varargin];
             else
                 options = varargin;
             end
         end
         
-        % Draw 3D edges
-        x = [obj.Vertices(obj.Edges(:,1), 1) obj.Vertices(obj.Edges(:,2), 1)]';
-        y = [obj.Vertices(obj.Edges(:,1), 2) obj.Vertices(obj.Edges(:,2), 2)]';
-        z = [obj.Vertices(obj.Edges(:,1), 3) obj.Vertices(obj.Edges(:,2), 3)]';
+        % Draw 3D points
+        if isempty(inds)
+            x = obj.Vertices(:, 1);
+            y = obj.Vertices(:, 2);
+            z = obj.Vertices(:, 3);
+        else
+            x = obj.Vertices(inds, 1);
+            y = obj.Vertices(inds, 2);
+            z = obj.Vertices(inds, 3);
+        end
         hh = plot3(hAx, x, y, z, options{:});
 
         % optionnally add style processing
@@ -1192,6 +1173,117 @@ methods
         end
     end
 
+    function h = drawEdges(varargin)
+        % Draw the edges of this complex
+        
+        % extract handle of axis to draw in
+        if numel(varargin{1}) == 1 && ishghandle(varargin{1}, 'axes')
+            hAx = varargin{1};
+            varargin(1) = [];
+        else
+            hAx = gca;
+        end
+
+        % extract the mesh instance from the list of input arguments
+        obj = varargin{1};
+        varargin(1) = [];
+        
+        % add default drawing options
+        inds = [];
+        options = {'Color', [0 0 0]};
+
+        % extract optional drawing options
+        if nargin > 1 && isnumeric(varargin{1})
+            % get index of edges to draw
+            inds = varargin{1};
+            varargin(1) = [];
+        end
+        if nargin > 1 && ischar(varargin{1})
+            if nargin > 2
+                options = [options varargin];
+            else
+                options = varargin;
+            end
+        end
+        
+        % Draw 3D edges
+        if isempty(inds)
+            x = [obj.Vertices(obj.Edges(:,1), 1) obj.Vertices(obj.Edges(:,2), 1)]';
+            y = [obj.Vertices(obj.Edges(:,1), 2) obj.Vertices(obj.Edges(:,2), 2)]';
+            z = [obj.Vertices(obj.Edges(:,1), 3) obj.Vertices(obj.Edges(:,2), 3)]';
+        else
+            x = [obj.Vertices(obj.Edges(inds,1), 1) obj.Vertices(obj.Edges(inds,2), 1)]';
+            y = [obj.Vertices(obj.Edges(inds,1), 2) obj.Vertices(obj.Edges(inds,2), 2)]';
+            z = [obj.Vertices(obj.Edges(inds,1), 3) obj.Vertices(obj.Edges(inds,2), 3)]';
+        end
+        hh = plot3(hAx, x, y, z, options{:});
+
+        % optionnally add style processing
+        if ~isempty(varargin) && isa(varargin{1}, 'Style')
+            apply(varargin{1}, hh);
+        end
+                
+        if nargout > 0
+            h = hh;
+        end
+    end
+
+    function h = drawFaces(varargin)
+        % Draw the faces of this mesh, using the patch function.
+        %
+        % see also
+        %   draw, drawVertices, drawEdges
+        
+        % extract handle of axis to draw in
+        if numel(varargin{1}) == 1 && ishghandle(varargin{1}, 'axes')
+            hAx = varargin{1};
+            varargin(1) = [];
+        else
+            hAx = gca;
+        end
+
+        % extract the mesh instance from the list of input arguments
+        obj = varargin{1};
+        varargin(1) = [];
+        
+        % add default drawing options
+        inds = [];
+        options = {'FaceColor', [.75 .75 .75]};
+
+        % extract optional drawing options
+        if nargin > 1 && isnumeric(varargin{1})
+            % get index of faces to draw
+            inds = varargin{1};
+            varargin(1) = [];
+        end
+        if nargin > 1 && ischar(varargin{1})
+            options = [options varargin];
+        end
+        
+        if length(options) == 1
+            options = [{'facecolor', [.75 .75 .75]} options];
+        end
+
+        if isempty(inds)
+            hh = patch('Parent', hAx, ...
+                'vertices', obj.Vertices, 'faces', obj.Faces, ...
+                options{:} );
+        else
+            hh = patch('Parent', hAx, ...
+                'vertices', obj.Vertices, 'faces', obj.Faces(inds, :), ...
+                options{:} );
+        end
+        
+        % optionnally add style processing
+        if ~isempty(varargin) && isa(varargin{1}, 'Style')
+            apply(varargin{1}, hh);
+        end
+                
+        if nargout > 0
+            h = hh;
+        end
+    end
+    
     function h = drawFaceNormals(obj, varargin)
         
         % compute vector data
