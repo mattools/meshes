@@ -267,6 +267,69 @@ methods
 end
 
 
+%% Mesh edition methods
+methods
+    function splitEdge(obj, edgeIndex)
+        
+        % get indices of faces adjacent to current edge
+        ensureValidEdgeFaces(obj);
+        adjFaceInds = obj.EdgeFaces{edgeIndex};
+        
+        % check local topology
+        if length(adjFaceInds) ~= 2
+            error('Can only split edges with two adjacent faces, not %d', length(adjFaceInds));
+        end
+        f1 = adjFaceInds(1);
+        f2 = adjFaceInds(2);
+
+        % get indices of adjacent and opoosite vertices around current edge
+        v1 = obj.Edges(edgeIndex, 1);
+        v2 = obj.Edges(edgeIndex, 2);
+        face1 = obj.Faces(f1, :);
+        vf1 = face1(~ismember(face1, [v1 v2]));
+        face2 = obj.Faces(f2, :);
+        vf2 = face2(~ismember(face2, [v1 v2]));
+        
+        % add new vertex in the middle of new edge
+        pos = edgeCentroid(obj, edgeIndex);
+        vNew = addVertex(obj, pos);
+        
+        % update first face: replace v2 with vNew
+        face1(face1 == v2) = vNew;
+        obj.Faces(f1, :) = face1;
+        % update second face: replace v2 with vNew
+        face2(face2 == v2) = vNew;
+        obj.Faces(f2, :) = face2;
+        
+        % add three new edges
+        ne0 = addEdge(obj, [vNew v2]);
+        ne1 = addEdge(obj, [vNew vf1]);
+        ne2 = addEdge(obj, [vNew vf2]);
+        
+        % add three new faces
+        nf1 = addFace(obj, [vf1 v2 vNew]);
+        nf2 = addFace(obj, [vf2 v2 vNew]);
+        
+        %              vf1                               vf1
+        %           -       -                         -   |   -
+        %       e11     f1    e21                 e11    ne1    e21
+        %     -                   -             -    f1   |  nf1    -
+        % v1 ----------------------- v2     v1 -- e0 -- vNew -- ne0 -- v2
+        %     -                   -             -    f2   |  nf2    -
+        %       e12     f2    e22                 e12    ne2    e22
+        %           -       -                         -   |   -
+        %              vf2                               vf2
+        
+        % attach new faces to new edges
+        obj.EdgeFaces{ne0} = [nf1, nf2];
+        obj.EdgeFaces{ne1} = [f1, nf1];
+        obj.EdgeFaces{ne2} = [f2, nf2];
+        
+        % TODO: if necessary, updates faceEdges info
+        % TODO: if necessary, updates vertexEdges info
+    end
+end
+
 %% Geometry methods
 methods
     function box = boundingBox(obj)
@@ -347,6 +410,12 @@ methods
         end
     end
 
+    function centro = edgeCentroid(obj, edgeIndex)
+        v1 = obj.Vertices(obj.Edges(edgeIndex,1), :);
+        v2 = obj.Vertices(obj.Edges(edgeIndex,2), :);
+        centro = (v1 + v2) / 2;
+    end
+    
     function [dist, proj] = distanceToPoint(obj, point, varargin)
         % Shortest distance between a (3D) point and the mesh.
         %
@@ -912,9 +981,9 @@ methods
                 obj.FaceEdges(indFace, :) = edgeInds;
             end
             if ~isempty(obj.EdgeFaces)
-                obj.EdgeFaces{edgeInds(1)} = [obj.EdgeFaces{edgeInds(1)} ind];
-                obj.EdgeFaces{edgeInds(2)} = [obj.EdgeFaces{edgeInds(2)} ind];
-                obj.EdgeFaces{edgeInds(3)} = [obj.EdgeFaces{edgeInds(3)} ind];
+                obj.EdgeFaces{edgeInds(1)} = [obj.EdgeFaces{edgeInds(1)} indFace];
+                obj.EdgeFaces{edgeInds(2)} = [obj.EdgeFaces{edgeInds(2)} indFace];
+                obj.EdgeFaces{edgeInds(3)} = [obj.EdgeFaces{edgeInds(3)} indFace];
             end
         end
     end
