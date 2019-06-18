@@ -26,8 +26,12 @@ classdef GenericTriMesh < handle
 
 %% Properties
 properties
-    % The array of vertices, as a Nv-by-3 array of corodinates
+    % The array of vertices, as a Nv-by-3 array of coordinates
     Vertices;
+    
+    % An array of boolean flags indicatingfor which vertex if it is valid
+    % (default is true for each vertex)
+    VertexValidities;
     
     % The topology on edges, as a NE-by-2 array containing vertex indices
     Edges;
@@ -92,9 +96,8 @@ methods
 
         if nargin == 2 && isnumeric(varargin{1}) && isnumeric(varargin{2})
             % classical vertex-face constructor
-            obj.Vertices = varargin{1};
+            setVertices(obj, varargin{1});
             obj.Faces = varargin{2};
-            
         end
     end
 
@@ -328,6 +331,24 @@ methods
         % TODO: if necessary, updates faceEdges info
         % TODO: if necessary, updates vertexEdges info
     end
+    
+    function splitFace(obj, faceIndex)
+        % Splits the specified face into three triangular faces.
+        centro = faceCentroids(obj, faceIndex);
+        vNew = addVertex(obj, centro);
+        v1 = obj.Faces(faceIndex, 1);
+        v2 = obj.Faces(faceIndex, 2);
+        v3 = obj.Faces(faceIndex, 3);
+        obj.Faces(faceIndex, 3) = vNew;
+        addFace(obj, [v2 v3 vNew]);
+        addFace(obj, [v3 v1 vNew]);
+        
+        clearEdges(obj);
+        
+        % TODO: if necessary, updates Edges info
+        % TODO: if necessary, updates faceEdges info
+        % TODO: if necessary, updates vertexEdges info
+    end
 end
 
 %% Geometry methods
@@ -369,15 +390,26 @@ methods
         res = GenericTriMesh(newVertices, newFaces);
     end
     
-    function centroids = faceCentroids(obj)
+    function centroids = faceCentroids(obj, varargin)
         % computes the normals of all faces in the mesh
         
-        nf = size(obj.Faces, 1);
-        centroids = zeros(nf, 3);
-        % For triangular meshes, uses accelerated method
-        % (taken from https://github.com/alecjacobson/gptoolbox)
-        for ff = 1:3
-            centroids = centroids + obj.Vertices(obj.Faces(:,ff),:) / 3.0;
+        if nargin == 1
+            nf = size(obj.Faces, 1);
+            centroids = zeros(nf, 3);
+            % For triangular meshes, uses accelerated method
+            % (taken from https://github.com/alecjacobson/gptoolbox)
+            for ff = 1:3
+                centroids = centroids + obj.Vertices(obj.Faces(:,ff),:) / 3.0;
+            end
+        else
+            indFaces = varargin{1};
+            nf = length(indFaces);
+            centroids = zeros(nf, 3);
+            % For triangular meshes, uses accelerated method
+            % (taken from https://github.com/alecjacobson/gptoolbox)
+            for ff = 1:3
+                centroids = centroids + obj.Vertices(obj.Faces(indFaces,ff),:) / 3.0;
+            end
         end
     end
     
@@ -669,7 +701,7 @@ methods
         
         % create the resulting mesh
         res = GenericTriMesh();
-        res.Vertices = newVertices;
+        setVertices(res, newVertices);
         res.Edges = newEdges;
     end
     
@@ -767,7 +799,7 @@ methods
         
         % create the resulting mesh
         res = GenericTriMesh();
-        res.Vertices = newVertices;
+        setVertices(res, newVertices);
         res.Edges = newEdges;
     end
     
@@ -886,7 +918,9 @@ end
 %% Vertex management methods
 methods
     function nv = vertexNumber(obj)
-        nv = size(obj.Vertices, 1);
+        % Returns the number of valid vertices.
+        % (the result may be different from the size of the Vertices array)
+        nv = sum(obj.VertexValidities);
     end
     
     function ind = addVertex(obj, position)
@@ -894,6 +928,7 @@ methods
             error('Require a 1-by-3 array of coordinates as input argument');
         end
         obj.Vertices = [obj.Vertices ; position];
+        obj.VertexValidities = [obj.VertexValidities ; true];
         ind = size(obj.Vertices, 1);
 
         % optionnally updates topological data structures
@@ -903,6 +938,49 @@ methods
         if ~isempty(obj.VertexFaces)
             obj.VertexFaces{ind} = [];
         end
+    end
+    
+    function removeVertex(obj, indVertex)
+        
+        if ~isscalar(indVertex)
+            error('vertex index must be a scalar');
+        end
+        if indVertex > size(obj.Vertices, 1)
+            error('vertex index %d is greater than vertex number', indVertex);
+        end
+        if ~obj.VertexValidities(indVertex)
+            error('vertex index %d is already removed', indVertex);
+        end
+        
+        if ~isempty(obj.VertexEdges)
+            if ~isempty(obj.VertexEdges{indVertex})
+                error('Can not remove vertex %d as it is adjacent to %d edges', ...
+                    indVertex, length(obj.VertexEdges{indVertex}));
+            end
+        end
+        if ~isempty(obj.VertexFaces)
+            if ~isempty(obj.VertexFaces{indVertex})
+                error('Can not remove vertex %d as it is adjacent to %d faces', ...
+                    indVertex, length(obj.VertexFaces{indVertex}));
+            end
+        end
+        if any(any(obj.Faces == indVertex))
+             error('Can not remove vertex %d as it is adjacent to at least one face', ...
+                 indVertex);
+        end
+        if ~isempty(obj.Edges)
+            if any(any(obj.Edges == indVertex))
+                error('Can not remove vertex %d as it is adjacent to at least one edge', ...
+                    indVertex);
+            end
+        end
+        obj.VertexValidities(indVertex) = false;
+    end
+    
+    function setVertices(obj, coords)
+        % Replaces the array of vertices with the new position array
+        obj.Vertices = coords;
+        obj.VertexValidities = true(size(obj.Vertices, 1), 1);
     end
 end
 
@@ -1407,4 +1485,3 @@ methods
 end
 
 end % end classdef
-
