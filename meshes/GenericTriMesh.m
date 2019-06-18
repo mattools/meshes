@@ -349,6 +349,47 @@ methods
         % TODO: if necessary, updates faceEdges info
         % TODO: if necessary, updates vertexEdges info
     end
+    
+    function flipEdge(obj, edgeIndex)
+        %
+        %              vf1                               vf1
+        %           -       -                         -   |   -
+        %       e11     f1    e21                 e11     |     e21
+        %     -                   -             -         |         -
+        % v1 ---------- e ---------- v2     v1      f1    e    f2      v2
+        %     -                   -             -         |         -
+        %       e12     f2    e22                 e12     |     e22
+        %           -       -                         -   |   -
+        %              vf2                               vf2
+        
+        % get indices of faces adjacent to current edge
+        ensureValidEdgeFaces(obj);
+        adjFaceInds = obj.EdgeFaces{edgeIndex};
+        
+        % check local topology
+        if length(adjFaceInds) ~= 2
+            error('Can only flip edges with two adjacent faces, not %d', length(adjFaceInds));
+        end
+        f1 = adjFaceInds(1);
+        f2 = adjFaceInds(2);
+
+        % get indices of adjacent and opoosite vertices around current edge
+        v1 = obj.Edges(edgeIndex, 1);
+        v2 = obj.Edges(edgeIndex, 2);
+        face1 = obj.Faces(f1, :);
+        vf1 = face1(~ismember(face1, [v1 v2]));
+        face2 = obj.Faces(f2, :);
+        vf2 = face2(~ismember(face2, [v1 v2]));
+
+        obj.Faces(f1, :) = [v1 vf2 vf1];
+        obj.Faces(f2, :) = [v2 vf1 vf2];
+
+        obj.Edges(edgeIndex, :) = sort([vf1 vf2]);
+        
+        % TODO: if necessary, updates faceEdges info
+        % TODO: if necessary, updates vertexEdges info
+        
+    end
 end
 
 %% Geometry methods
