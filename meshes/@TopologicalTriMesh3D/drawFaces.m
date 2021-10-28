@@ -41,15 +41,18 @@ if length(options) == 1
     options = [{'facecolor', [.75 .75 .75]} options];
 end
 
+% retrieve face information
 if isempty(inds)
-    hh = patch('Parent', hAx, ...
-        'vertices', obj.Vertices, 'faces', obj.Faces, ...
-        options{:} );
+    faces = obj.Faces;
 else
-    hh = patch('Parent', hAx, ...
-        'vertices', obj.Vertices, 'faces', obj.Faces(inds, :), ...
-        options{:} );
+    faces = obj.Faces(inds, :);
 end
+faces = faces(sum(faces < 1, 2) == 0, :);    
+
+hh = patch('Parent', hAx, ...
+    'vertices', obj.Vertices, 'faces', faces, ...
+    options{:} );
+
 
 % optionnally add style processing
 if ~isempty(varargin) && isa(varargin{1}, 'Style')

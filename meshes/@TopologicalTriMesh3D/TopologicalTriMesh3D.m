@@ -43,10 +43,11 @@ properties
     % The topology on edges, as a NE-by-2 array containing vertex indices.
     Edges;
     
-    % the NF-by-3 array containing vertex indices of each face.
+    % The NF-by-3 array containing vertex indices of each face.
+    % Some rows may contains [-1 -1 -1] if the face was removed.
     Faces;
     
-    % cell array containing indices of faces associated to each edge.
+    % Cell array containing indices of faces associated to each edge.
     % should be 2 for regular edges, or 1 for boundary edges, but can be
     % more for non manifold edges.
     EdgeFaces = cell(1, 0);
@@ -255,53 +256,6 @@ methods
         % TODO: if necessary, updates vertexEdges info
         
     end
-    
-    function collapseEdge(obj, edgeIndex)
-        % Collapse the two extremities of the edge, removing adjacent faces.
-        
-        if isempty(obj.Edges)
-            error('assumes edge array was computed');
-        end
-        
-        % list of edges to remove
-        edgesToRemove = edgeIndex;
-        
-        % indices of source and target vertices
-        v1 = obj.Edges(edgeIndex, 1);
-        v2 = obj.Edges(edgeIndex, 2);
-        
-        % get index of faces adjacent to current edge
-        ensureValidEdgeFaces(obj);
-        adjFaceInds = obj.EdgeFaces{edgeIndex};
-        
-        % for each adjacent face, merge remaining edges
-        for iFace = 1:length(adjFaceInds)
-            faceInds = obj.Faces(adjFaceInds(iFace), :);
-            v3 = faceInds(~ismember(faceInds, [v1 v2]));
-            ind = find(sum(ismember(obj.Edges, [v2 v3]), 2) == 2);
-            if length(ind) == 1
-                edgesToRemove = [edgesToRemove ; ind]; %#ok<AGROW>
-            end
-        end
-        
-        % remove adjacent faces
-        obj.Faces(adjFaceInds, :) = [];
-        % remove old edges
-        obj.Edges(edgesToRemove, :) = [];
-        
-        % as v2 becomes v1, need to update refs to v2.
-        obj.Edges(obj.Edges == v2) = v1;
-        obj.Faces(obj.Faces == v2) = v1;
-        obj.VertexValidities(v2) = false;
-        
-        % TODO: should update FaceEdge info
-        % TODO: should update VertexEdges info
-        % (for the moment, simply clear data)
-        obj.FaceEdges = {};
-        obj.EdgeFaces = {};
-        obj.VertexEdges = {};
-        obj.VertexFaces = {};
-    end
 end
 
 %% Geometry methods
@@ -386,7 +340,7 @@ end
 %% Topological queries
 methods
     function res = vertexLink(obj, vertexIndex)
-        % returns the link around the specifid vertex as a new mesh
+        % Return the 1-link around the specifid vertex as a new mesh.
         
         ensureValidEdges(obj);
         edgeInds = sum(obj.Edges == vertexIndex, 2) > 0;
@@ -409,7 +363,7 @@ methods
     end
     
     function polyList = vertexLinkPolygons(obj, vertexIndex)
-        % returns the link around a vertex as a list of 3D polylines
+        % Return the 1-link around a vertex as a list of 3D polylines.
         linkMesh = vertexLink(obj, vertexIndex);
 
         edges = linkMesh.Edges;
@@ -436,7 +390,7 @@ end
 %% topology management
 methods
     function [b1, b2] = isManifold(obj)
-        %ISMANIFOLDMESH Check whether the mesh may be considered as manifold.
+        % Check whether the mesh may be considered as manifold.
         %
         %   B = isManifoldMesh(MESH)
         %   Checks if the specified mesh is a manifold. When mesh is a manifold,
@@ -517,7 +471,7 @@ methods
     end
     
     function b = isBoundaryEdge(obj, edgeInd)
-        % Check if the  specified edge is boundary
+        % Check if the  specified edge is boundary.
         
         ensureValidEdgeFaces(obj);
         
@@ -567,6 +521,12 @@ methods
     function nv = vertexCount(obj)
         % Return the number of valid vertices.
         % (the result may be different from the size of the Vertices array)
+        %
+        % NV = vertexCount(MESH);
+        %
+        % See Also
+        %   size, faceCount, edgeCount
+        
         nv = sum(obj.VertexValidities);
     end
     
@@ -625,7 +585,7 @@ methods
     end
     
     function setVertices(obj, coords)
-        % Replaces the array of vertices with the new position array
+        % Replaces the array of vertices with the new position array.
         obj.Vertices = coords;
         obj.VertexValidities = true(size(obj.Vertices, 1), 1);
     end
@@ -634,21 +594,35 @@ end
 %% Edge management methods
 methods
     function ne = edgeCount(obj)
-        % ne = edgeNumber(mesh)
+        % Count the number of edges within the mesh.
+        %
+        % NE = edgeCount(MESH);
+        %
+        % See Also
+        %   size, faceCount, vertexCount
+        
         if isempty(obj.Edges)
             computeEdges(obj);
         end
-        ne = size(obj.Edges, 1);
+        ne = sum(sum(obj.Edges == -1, 2) == 0);
     end
     
     function ind = addEdge(obj, edgeVertices)
-        % Adds an edge given vertex indices and return new edge index
-        edge = sort(edgeVertices, 2); v1 = edge(1); v2 = edge(2);
+        % Add an edge given vertex indices and return new edge index.
+        
+        % identify extremity vertex indices
+        edge = sort(edgeVertices, 2); 
+        v1 = edge(1); 
+        v2 = edge(2);
+        
+        % check if edge exists
         if ~isempty(obj.Edges)
             if ~isempty(find(obj.Edges(:,1) == v1 & obj.Edges(:,2) == v2, 1))
                 error('Edge is already into mesh');
             end
         end
+        
+        % add the edge
         obj.Edges = [obj.Edges; edge];
         ind = size(obj.Edges, 1);
         
@@ -668,11 +642,21 @@ end
 %% Face management methods
 methods
     function nf = faceCount(obj)
-        nf = size(obj.Faces, 1);
+        % Number of faces within the mesh.
+        % Can be different from the size of the Faces array, as some faces
+        % may be marked as invalid.
+        %
+        % Usage
+        %   NF = faceCount(MESH);
+        %
+        % See Also
+        %   size, vertexCount, edgeCount
+
+        nf = sum(sum(obj.Faces < 1, 2) == 0);
     end
     
     function indFace = addFace(obj, vertexInds)
-        % Adds a face given 3 vertex indices and return new face index
+        % Add a face given 3 vertex indices and return new face index.
         
         if any(size(vertexInds) ~= [1 3])
             error('Require an array of three indices as input argument');
@@ -714,7 +698,7 @@ methods
     end
     
     function removeFace(obj, faceIndex)
-        % Removes a face. This resets topological properties.
+        % Remove a face. This resets topological properties.
         obj.Faces(faceIndex, :) = [];
         
         % TODO: update edges instead of clearing
@@ -722,6 +706,7 @@ methods
     end
     
     function adj = adjacencyMatrix(obj)
+        % Compute vertex-to-vertex adjacency matrix.
 
         % forces faces to be floating point array, for sparse function
         faces = obj.Faces;
@@ -744,7 +729,7 @@ end
 %% Local methods for updating local Properties 
 methods
     function clearEdges(obj)
-        % reset all data related to edges as well as VertexFaces.
+        % Reset all data related to edges as well as VertexFaces.
         % (to be called when vertices of faces properties are updated)
         obj.Edges = zeros(0, 2);
         obj.EdgeFaces = cell(1, 0);
@@ -760,7 +745,7 @@ methods
     end
     
     function computeEdges(obj)
-        % updates the property "Edges"
+        % Update the property "Edges" from the Faces array.
         
         % compute total number of edges
         % (3 edges per face)
@@ -785,12 +770,12 @@ methods
     end
     
     function computeFaceEdges(obj)
-        % compute face to edge indices array
-        % as a Nf-by-3 array (each face connected to exactly three edges)
+        % Compute Face-to-Edge index array, as a Nf-by-3 array.
+        % (each face is connected to exactly three edges)
         
         ensureValidEdges(obj);
         
-        nFaces = faceNumber(obj);
+        nFaces = faceCount(obj);
         obj.FaceEdges = zeros(nFaces, 3);
         
         % assume edges are sorted along dimension 2
@@ -918,6 +903,16 @@ end % end methods
 %% Overload Matlab functions 
 methods
     function dims = size(obj, varargin)
+        % Override the size function to return number of mesh elements.
+        %
+        % S = size(MESH)
+        % Returns a vector row with the number of vertices, of edges, and
+        % of faces.
+        %
+        % S = size(MESH, I)
+        % Returns the number of elements according to I, that can be 1, 2
+        % or 3.
+        %
         if isempty(varargin)
             dims = [size(obj.Vertices, 1) size(obj.Edges, 1) size(obj.Faces, 1)];
         else
