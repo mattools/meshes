@@ -8,6 +8,13 @@ classdef TopologicalTriMesh3D < handle
 %   It is expected to be possible to remove elements from the mesh (work in
 %   progress).
 %
+%   Some features:
+%   * Properties "Vertices" and "Faces" are mandatory, the other ones may
+%       be computed when necessary
+%   * Operations that changes the topology of the mesh should try to update
+%       the existing information about adjacencies. If not, the data should
+%       be set to empty to avoid inconsistent state.
+%
 %   Requires the "Geometry" package.
 %
 %   Example
@@ -262,14 +269,18 @@ end
 methods
     function box = bounds(obj)
         % Return the bounds of this mesh.
-        mini = min(obj.Vertices);
-        maxi = max(obj.Vertices);
+        vertices = obj.Vertices(obj.VertexValidities, :);
+        mini = min(vertices);
+        maxi = max(vertices);
         box = Bounds3D([mini(1) maxi(1) mini(2) maxi(2) mini(3) maxi(3)]);
     end
     
     function lengths = edgeLength(obj, varargin)
         ensureValidEdges(obj);
-        lengths = sum((obj.Vertices(obj.Edges(:,1), :) - obj.Vertices(obj.Edges(:,2), :)).^2, 2);
+        
+        inds = sum(obj.Edges == -1, 2) == 0;
+        lengths = NaN * ones(size(inds));
+        lengths(inds) = sum((obj.Vertices(obj.Edges(inds,1), :) - obj.Vertices(obj.Edges(inds,2), :)).^2, 2);
     end
     
     function centroids = faceCentroids(obj, varargin)
@@ -547,6 +558,35 @@ methods
         end
     end
     
+    function vertexInds = removeInvalidVertices(obj)
+        % Remove vertices marked as invalid from the mesh.
+        
+        % find index of vertices to remove (if any)
+        vertexInds = find(~obj.VertexValidities);
+        
+        % Compute the mapping from old indices to new indices
+        vertexIndexMap = zeros(size(obj.Vertices, 1), 1);
+        vertexIndexMap(obj.VertexValidities) = 1:sum(obj.VertexValidities);
+        
+        % cleanup edges
+        if ~isempty(obj.Edges)
+            validEdges = sum(obj.Edges == -1, 2) == 0;
+            edges = obj.Edges(validEdges, :);
+            edges = vertexIndexMap(edges);
+            obj.Edges(validEdges, :) = edges;
+        end
+        
+        % cleanup faces
+        validFaces = sum(obj.Faces == -1, 2) == 0;
+        faces = obj.Faces(validFaces, :);
+        faces = vertexIndexMap(faces);
+        obj.Faces(validFaces, :) = faces;
+        
+        % remove vertices data
+        obj.Vertices(vertexInds, :) = [];
+        obj.VertexValidities(vertexInds) = [];
+    end
+    
     function removeVertex(obj, indVertex)
         
         if ~isscalar(indVertex)
@@ -699,10 +739,48 @@ methods
     
     function removeFace(obj, faceIndex)
         % Remove a face. This resets topological properties.
-        obj.Faces(faceIndex, :) = [];
+        obj.Faces(faceIndex, :) = -1;
         
         % TODO: update edges instead of clearing
         clearEdges(obj);
+    end
+    
+    function invalidFaceInds = removeInvalidFaces(obj)
+        % Remove faces marked as invalid from the mesh.
+        
+        % find index of faces to remove (if any)
+        invalidFaceInds = find(sum(obj.Faces == -1, 2) > 0);
+        validFaces = sum(obj.Faces == -1, 2) == 0;
+        
+        % Compute the mapping from old indices to new indices
+        faceIndexMap = zeros(size(obj.Faces, 1), 1);
+        faceIndexMap(validFaces) = 1:sum(validFaces);
+        
+        % cleanup edges
+        if ~isempty(obj.EdgeFaces)
+            validEdges = find(sum(obj.Edges == -1, 2) == 0);
+            for iEdge = 1:length(validEdges)
+                inds = obj.EdgeFaces{validEdges(iEdge)};
+                inds = faceIndexMap(inds);
+                obj.EdgeFaces{validEdges(iEdge)} = inds;
+            end
+        end
+        
+        % cleanup edges
+        if ~isempty(obj.VertexFaces)
+            validVertices = find(obj.VertexValidities);
+            for iVertex = 1:length(validVertices)
+                inds = obj.VertexFaces{validVertices(iVertex)};
+                inds = faceIndexMap(inds);
+                obj.VertexFaces{validVertices(iVertex)} = inds;
+            end
+        end
+        
+        % keep valid face data
+        obj.Faces = obj.Faces(validFaces, :);
+        if ~isempty(obj.FaceEdges)
+            obj.FaceEdges = obj.FaceEdges(validFaces);
+        end
     end
     
     function adj = adjacencyMatrix(obj)
