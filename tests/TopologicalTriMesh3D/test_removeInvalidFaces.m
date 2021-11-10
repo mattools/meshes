@@ -23,17 +23,19 @@ function test_Simple(testCase) %#ok<*DEFNU>
 % first create a simple mesh with invalid vertices and faces
 vertices = [...
     30 30; 50 30; 70 30; ...
-    20 50; -1 -1; 60 50; 80 50; ...
+    20 50; 40 50; 60 50; 80 50; ...
     30 70; 50 70; 70 70];
 faces = [...
-    1 2 6; 1 6 4; 2 3 6; -1 -1 -1; 3 7 6; ...
-    4 6 8; -1 -1 -1; 6 9 8; 6 7 10; 6 10 9];
+    1 2 5; 1 5 4; 2 3 6; 2 6 5; 3 7 6; ...
+    4 5 8; 5 6 9; 5 9 8; 6 7 10; 6 10 9];
 mesh = TopologicalTriMesh3D(vertices, faces);
-computeEdges(mesh);
-mesh.VertexValidities(5) = false;
+% remove some faces
+removeFace(mesh, 1);
+removeFace(mesh, 4);
+removeFace(mesh, 9);
 
 removeInvalidFaces(mesh);
 
-assertEqual(testCase, 8, faceCount(mesh));
-assertEqual(testCase, 8, size(mesh.Faces, 1));
+assertEqual(testCase, 7, faceCount(mesh));
+assertEqual(testCase, 7, size(mesh.Faces, 1));
 

@@ -46,16 +46,14 @@ if nargin > 1 && ischar(varargin{1})
     end
 end
 
-% Draw 3D edges
 if isempty(inds)
-    x = [obj.Vertices(obj.Edges(:,1), 1) obj.Vertices(obj.Edges(:,2), 1)]';
-    y = [obj.Vertices(obj.Edges(:,1), 2) obj.Vertices(obj.Edges(:,2), 2)]';
-    z = [obj.Vertices(obj.Edges(:,1), 3) obj.Vertices(obj.Edges(:,2), 3)]';
-else
-    x = [obj.Vertices(obj.Edges(inds,1), 1) obj.Vertices(obj.Edges(inds,2), 1)]';
-    y = [obj.Vertices(obj.Edges(inds,1), 2) obj.Vertices(obj.Edges(inds,2), 2)]';
-    z = [obj.Vertices(obj.Edges(inds,1), 3) obj.Vertices(obj.Edges(inds,2), 3)]';
+    inds = obj.ValidEdges;
 end
+
+% Draw 3D edges
+x = [obj.Vertices(obj.Edges(inds,1), 1) obj.Vertices(obj.Edges(inds,2), 1)]';
+y = [obj.Vertices(obj.Edges(inds,1), 2) obj.Vertices(obj.Edges(inds,2), 2)]';
+z = [obj.Vertices(obj.Edges(inds,1), 3) obj.Vertices(obj.Edges(inds,2), 3)]';
 hh = plot3(hAx, x, y, z, options{:});
 
 % optionnally add style processing
