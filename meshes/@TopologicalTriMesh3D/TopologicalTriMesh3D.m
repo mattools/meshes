@@ -291,14 +291,16 @@ methods
         box = Bounds3D([mini(1) maxi(1) mini(2) maxi(2) mini(3) maxi(3)]);
     end
     
-    function lengths = edgeLength(obj, varargin)
+    function [lengths, inds] = edgeLength(obj, varargin)
         % Compute length of edges in mesh.
         %
         % LEN = edgeLength(MESH)
         % LEN = edgeLength(MESH, EINDS)
+        % [LEN, INDS] = edgeLength(...)
+        % also returns the indices of edges for which length was computed.
         
         if isempty(varargin)
-            inds = obj.ValidEdges;
+            inds = find(obj.ValidEdges);
         else
             inds = varargin{1};
         end
