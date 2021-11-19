@@ -162,9 +162,22 @@ end
 %% Mesh edition methods
 methods
     function splitEdge(obj, edgeIndex)
+        % Split the specified edge, creating two new faces.
+        %
+        %   splitEdge(MESH, EDGEIDX);
+        %
         
+        %              vf1                               vf1
+        %           -       -                         -   |   -
+        %       e11     f1    e21                 e11    ne1    e21
+        %     -                   -             -    f1   |  nf1    -
+        % v1 ----------------------- v2     v1 -- e0 -- vNew -- ne0 -- v2
+        %     -                   -             -    f2   |  nf2    -
+        %       e12     f2    e22                 e12    ne2    e22
+        %           -       -                         -   |   -
+        %              vf2                               vf2
+
         % get indices of faces adjacent to current edge
-        ensureValidEdgeFaces(obj);
         adjFaceInds = obj.EdgeFaces{edgeIndex};
         
         % check local topology
@@ -174,7 +187,7 @@ methods
         f1 = adjFaceInds(1);
         f2 = adjFaceInds(2);
 
-        % get indices of adjacent and opoosite vertices around current edge
+        % get indices of adjacent and opposite vertices around current edge
         v1 = obj.Edges(edgeIndex, 1);
         v2 = obj.Edges(edgeIndex, 2);
         face1 = obj.Faces(f1, :);
@@ -186,39 +199,43 @@ methods
         pos = edgeCentroid(obj, edgeIndex);
         vNew = addVertex(obj, pos);
         
-        % update first face: replace v2 with vNew
-        face1(face1 == v2) = vNew;
-        obj.Faces(f1, :) = face1;
-        % update second face: replace v2 with vNew
-        face2(face2 == v2) = vNew;
-        obj.Faces(f2, :) = face2;
+        % update ref to v2 in current edge
+        obj.Edges(edgeIndex, obj.Edges(edgeIndex, :) == v2) = vNew;
+        % update vertex edge: remove ref current edge from vertex v2
+        obj.VertexEdges{v2}(obj.VertexEdges{v2} == edgeIndex) = [];
+        % create edge refs of new vertex
+        obj.VertexEdges{vNew} = edgeIndex;
         
-        % add three new edges
-        ne0 = addEdge(obj, [vNew v2]);
+        % create three new edges
+        ne0 = addEdge(obj, [vNew v2]); %#ok<NASGU>
         ne1 = addEdge(obj, [vNew vf1]);
         ne2 = addEdge(obj, [vNew vf2]);
         
+        % update face vertices: replace v2 with vNew in f1 and f2
+        obj.Faces(f1, obj.Faces(f1, :) == v2) = vNew;
+        obj.Faces(f2, obj.Faces(f2, :) == v2) = vNew;
+        
+        % update vertex faces: ref to f1 and f2 from vertex v2 to vNew
+        obj.VertexFaces{v2}(ismember(obj.VertexFaces{v2}, [f1 f2])) = [];
+        obj.VertexFaces{vNew} = [f1 f2];
+        
+        % update face edges: replace e2_i by ne_i
+        v2EdgeInds = obj.VertexEdges{v2};
+        e21 = v2EdgeInds(sum(obj.Edges(v2EdgeInds, :) == vf1, 2) > 0);
+        e22 = v2EdgeInds(sum(obj.Edges(v2EdgeInds, :) == vf2, 2) > 0);
+        obj.FaceEdges(f1, obj.FaceEdges(f1,:) == e21) = ne1;
+        obj.FaceEdges(f2, obj.FaceEdges(f2,:) == e22) = ne2;
+        
+        % update edge faces: remove ref to f_i from edge e2_i
+        obj.EdgeFaces{e21}(obj.EdgeFaces{e21} == f1) = [];
+        obj.EdgeFaces{e22}(obj.EdgeFaces{e22} == f2) = [];
+        % and add refs to f_i from new edges
+        obj.EdgeFaces{ne1} = f1;
+        obj.EdgeFaces{ne2} = f2;
+        
         % add three new faces
-        nf1 = addFace(obj, [vf1 v2 vNew]);
-        nf2 = addFace(obj, [vf2 v2 vNew]);
-        
-        %              vf1                               vf1
-        %           -       -                         -   |   -
-        %       e11     f1    e21                 e11    ne1    e21
-        %     -                   -             -    f1   |  nf1    -
-        % v1 ----------------------- v2     v1 -- e0 -- vNew -- ne0 -- v2
-        %     -                   -             -    f2   |  nf2    -
-        %       e12     f2    e22                 e12    ne2    e22
-        %           -       -                         -   |   -
-        %              vf2                               vf2
-        
-        % attach new faces to new edges
-        obj.EdgeFaces{ne0} = [nf1, nf2];
-        obj.EdgeFaces{ne1} = [f1, nf1];
-        obj.EdgeFaces{ne2} = [f2, nf2];
-        
-        % TODO: updates faceEdges info
-        % TODO: updates vertexEdges info
+        nf1 = addFace(obj, [vf1 vNew v2]); %#ok<NASGU>
+        nf2 = addFace(obj, [vf2 v2 vNew]); %#ok<NASGU>
     end
     
     function splitFace(obj, faceIndex)
@@ -681,11 +698,23 @@ methods
         ne = sum(obj.ValidEdges);
     end
     
-    function ind = addEdge(obj, edgeVertices)
+    function ind = addEdge(obj, indV1, indV2)
         % Add an edge given vertex indices and return new edge index.
+        %
+        %   EDGEIDX = addEdge(MESH, IV1, IV2)
+        %   EDGEIDX = addEdge(MESH, [IV1 IV2])
+        %   Creates a new edge given the indices IV1 and IV2 of the source
+        %   and target vertices, and returns the index of the new edge.
+        %
         
+        if nargin == 2
+            edgeVertices = indV1;
+        else
+            edgeVertices = [indV1 indV2];
+        end
+
         % check input validity
-        if any(~obj.ValidVertices(edgeVertices))
+        if any(~obj.ValidVertices(edgeVertices(:)))
             error('Can not create an edge with invalid vertices');
         end
         
