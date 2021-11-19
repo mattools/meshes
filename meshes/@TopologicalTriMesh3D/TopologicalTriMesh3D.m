@@ -285,7 +285,6 @@ methods
         %              vf2                               vf2
         
         % get indices of faces adjacent to current edge
-        ensureValidEdgeFaces(obj);
         adjFaceInds = obj.EdgeFaces{edgeIndex};
         
         % check local topology
@@ -295,22 +294,44 @@ methods
         f1 = adjFaceInds(1);
         f2 = adjFaceInds(2);
 
-        % get indices of adjacent and opoosite vertices around current edge
+        % get indices of adjacent and opposite vertices around current edge
         v1 = obj.Edges(edgeIndex, 1);
         v2 = obj.Edges(edgeIndex, 2);
         face1 = obj.Faces(f1, :);
         vf1 = face1(~ismember(face1, [v1 v2]));
         face2 = obj.Faces(f2, :);
         vf2 = face2(~ismember(face2, [v1 v2]));
+        
+        % get index of edges adjacent f1 and f2
+        e12 = findEdgeIndex(obj, [v1 vf2]);
+        e21 = findEdgeIndex(obj, [v2 vf1]);
 
+        % update vertex indices of faces
         obj.Faces(f1, :) = [v1 vf2 vf1];
         obj.Faces(f2, :) = [v2 vf1 vf2];
-
+        
+        % update face indices of vertices
+        obj.VertexFaces{v1}(obj.VertexFaces{v1} == f2) = [];
+        obj.VertexFaces{v2}(obj.VertexFaces{v2} == f1) = [];
+        obj.VertexFaces{vf1} = [obj.VertexFaces{vf1} f2];
+        obj.VertexFaces{vf2} = [obj.VertexFaces{vf2} f1];
+        
+        % update edge indices of vertices
+        obj.VertexEdges{v1}(obj.VertexEdges{v1} == edgeIndex) = [];
+        obj.VertexEdges{v2}(obj.VertexEdges{v2} == edgeIndex) = [];
+        obj.VertexEdges{vf1} = [obj.VertexEdges{vf1} edgeIndex];
+        obj.VertexEdges{vf2} = [obj.VertexEdges{vf2} edgeIndex];
+        
+        % update face edge indices
+        obj.FaceEdges(f1, obj.FaceEdges(f1, :) == e21) = e12;
+        obj.FaceEdges(f2, obj.FaceEdges(f2, :) == e12) = e21;
+        
+        % update edge face indices
+        obj.EdgeFaces{e21}(obj.EdgeFaces{e21} == f1) = f2;
+        obj.EdgeFaces{e12}(obj.EdgeFaces{e12} == f2) = f1;
+        
+        % update vertices of current edge
         obj.Edges(edgeIndex, :) = sort([vf1 vf2]);
-        
-        % TODO: updates faceEdges info
-        % TODO: updates vertexEdges info
-        
     end
 end
 
