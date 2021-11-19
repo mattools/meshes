@@ -167,6 +167,8 @@ methods
         %   splitEdge(MESH, EDGEIDX);
         %
         
+        %   before split:                     after split:
+        %
         %              vf1                               vf1
         %           -       -                         -   |   -
         %       e11     f1    e21                 e11    ne1    e21
@@ -240,20 +242,34 @@ methods
     
     function splitFace(obj, faceIndex)
         % Splits the specified face into three triangular faces.
-        centro = faceCentroids(obj, faceIndex);
-        vNew = addVertex(obj, centro);
+        %
+        % splitFace(MESH, FIDX)
+        %
+
+        % retrieve vertex indices
         v1 = obj.Faces(faceIndex, 1);
         v2 = obj.Faces(faceIndex, 2);
         v3 = obj.Faces(faceIndex, 3);
-        obj.Faces(faceIndex, 3) = vNew;
+        
+        % compute centroid and add new vertex
+        centro = faceCentroid(obj, faceIndex);
+        vNew = addVertex(obj, centro);
+        
+        % update current face to use new vertex
+        obj.Faces(faceIndex, obj.Faces(faceIndex,:) == v3) = vNew;
+        
+        % detach current face from vertex v3
+        obj.VertexFaces{v3}(obj.VertexFaces{v3} == faceIndex) = [];
+
+        % detach current face from edges adjacent to v3
+        e13 = findEdgeIndex(obj, [v1 v3]);
+        obj.EdgeFaces{e13}(obj.EdgeFaces{e13} == faceIndex) = [];
+        e23 = findEdgeIndex(obj, [v2 v3]);
+        obj.EdgeFaces{e23}(obj.EdgeFaces{e23} == faceIndex) = [];
+        
+        % add two new faces
         addFace(obj, [v2 v3 vNew]);
         addFace(obj, [v3 v1 vNew]);
-        
-        clearEdges(obj);
-        
-        % TODO: updates Edges info
-        % TODO: updates faceEdges info
-        % TODO: updates vertexEdges info
     end
     
     function flipEdge(obj, edgeIndex)
