@@ -570,15 +570,17 @@ methods
         
         % create the resulting mesh
         res = TopologicalTriMesh3D();
-        setVertices(res, newVertices);
-        res.Edges = newEdges;
+        addVertex(res, newVertices);
+        for iEdge = 1:size(newEdges, 1)
+            addEdge(res, newEdges(iEdge,:));
+        end
     end
     
     function inds = boundaryEdgeIndices(obj)
         % Find boundary edges and returns their indices.
         
         % identifies edges adjacent to exactly 1 face.
-        inds = find(cellfun(@(x) length(x) == 1, obj.EdgeFaces));
+        inds = find(cellfun(@(x) length(x) == 1, obj.EdgeFaces(obj.ValidEdges)));
     end
     
     function b = isBoundaryEdge(obj, edgeInd)
