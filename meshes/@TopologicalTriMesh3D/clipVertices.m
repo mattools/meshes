@@ -1,7 +1,9 @@
 function res = clipVertices(obj, box)
 % Clip the mesh by retaining only vertices within the box.
 %
-%   output = truc(input)
+%   MESH2 = clipVertices(MESH, BOX)
+%   Where BOX has the folowing format:
+%   BOX = [XMIN XMAX  YMIN YMAX  ZMIN ZMAX];
 %
 %   Example
 %   truc

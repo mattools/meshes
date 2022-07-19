@@ -118,16 +118,14 @@ methods
             % convert TriMesh to topological mesh
             var1 = varargin{1};
             initializeVertices(obj, var1.Vertices);
-            obj.Faces = var1.Faces;
+            initializeFaces(obj, var1.Faces);
+            initializeEdges(obj);
             
         elseif nargin == 2 && isnumeric(varargin{1}) && isnumeric(varargin{2})
             % classical vertex-face constructor
             initializeVertices(obj, varargin{1});
-            
-            faces = varargin{2};
-            for iFace = 1:size(faces, 1)
-                addFace(obj, faces(iFace, :));
-            end
+            initializeFaces(obj, varargin{2});
+            initializeEdges(obj);
             
         else
             error('Unable to interpret input arguments');
@@ -141,6 +139,80 @@ methods
             obj.ValidVertices = true(nv, 1);
             obj.VertexEdges = cell(1, nv);
             obj.VertexFaces = cell(1, nv);
+        end
+
+        function initializeFaces(obj, faces)
+            % Initialize all face properties.
+            % (assume only Vertices are already set)
+            
+            if ~isnumeric(faces) || size(faces, 2) ~= 3
+                error('requires a numeric NF-by-3 array');
+            end
+            
+            % init Faces and ValidFaces
+            nFaces = size(faces, 1);
+            obj.Faces = faces;
+            obj.ValidFaces = true(nFaces, 1);
+                        
+            % init the VertexFaces data
+            for iFace = 1:size(faces, 1)
+                % for each vertex, add a reference to the face
+                for iv = 1:3
+                    indV = faces(iFace, iv);
+                    obj.VertexFaces{indV} = [obj.VertexFaces{indV} iFace];
+                end
+            end
+        end
+
+        function initializeEdges(obj)
+            % Initialize all edge properties.
+            % (assume vertex and faces already set).
+            
+            % estimate apriori edge count
+            nFaces = size(obj.Faces, 1);
+            nEdges = nFaces + size(obj.Vertices, 1);
+
+            % create arrays
+            obj.Edges = zeros(nEdges, 2);
+            obj.EdgeFaces = cell(1, nEdges);
+            obj.FaceEdges = zeros(nFaces, 3);
+            obj.ValidEdges = true(nEdges, 1);
+            
+            % populate data by iterating on faces
+            lastEdge = 0;
+            for iFace = 1:nFaces
+                for ie = 1:3
+                    % identifies vertex indices of current edge
+                    iv1 = obj.Faces(iFace, ie);
+                    iv2 = obj.Faces(iFace, mod(ie,3)+1);
+                    % enfore iv1 < iv2
+                    if iv1 > iv2
+                        tmp = iv1; iv1 = iv2; iv2 = tmp;
+                    end
+
+                    iEdge = find(obj.Edges(1:lastEdge, 1) == iv1 & obj.Edges(1:lastEdge, 2) == iv2);
+                    if isempty(iEdge)
+                        iEdge = lastEdge + 1;
+                        lastEdge = iEdge;
+
+                        % create edge
+                        obj.Edges(iEdge, :) = [iv1 iv2];
+                        obj.VertexEdges{iv1} = [obj.VertexEdges{iv1} iEdge];
+                        obj.VertexEdges{iv2} = [obj.VertexEdges{iv2} iEdge];
+                        obj.EdgeFaces{iEdge} = []; % ensure array grows
+                    end
+
+                    % update face - edge relationships
+                    obj.EdgeFaces{iEdge} = [obj.EdgeFaces{iEdge} iFace];
+                    obj.FaceEdges(iFace, ie) = iEdge;
+                end
+            end
+
+            % adjust size of edges arrays
+            nEdges = lastEdge;
+            obj.Edges = obj.Edges(1:nEdges, :);
+            obj.EdgeFaces = obj.EdgeFaces(1:nEdges);
+            obj.ValidEdges = obj.ValidEdges(1:nEdges);
         end
     end
 
@@ -526,19 +598,22 @@ methods
         %       logical
         %        1
 
-        % compute degree of each edge
-        nEdges = edgeCount(obj);
-        edgeFaceDegrees = zeros(nEdges, 1);
+        % compute degree of each valid edge
+        edgeInds = find(obj.ValidEdges);
+        nEdges = length(edgeInds);
+        edgeFaceDegrees = zeros(size(obj.Edges, 1), 1);
         for iEdge = 1:nEdges
-            edgeFaceDegrees(iEdge) = length(obj.EdgeFaces{iEdge});
+            ind = edgeInds(iEdge);
+            edgeFaceDegrees(ind) = length(obj.EdgeFaces{ind});
         end
         
         % for each face, concatenate the face degree of each edge
-        nFaces = faceCount(obj);
+        faceInds = find(obj.ValidFaces);
+        nFaces = length(faceInds);
         faceEdgeDegrees = zeros(nFaces, 3);
         for iFace = 1:nFaces
-            edgeInds = obj.FaceEdges(iFace, :);
-            faceEdgeDegrees(iFace, :) = edgeFaceDegrees(edgeInds);
+            inds = obj.FaceEdges(faceInds(iFace), :);
+            faceEdgeDegrees(iFace, :) = edgeFaceDegrees(inds);
         end
         
         regFaces = sum(ismember(faceEdgeDegrees, [1 2]), 2) == 3;
@@ -727,7 +802,7 @@ end
 %% Edge management methods
 methods
     function ne = edgeCount(obj)
-        % Count the number of edges within the mesh.
+        % Count the number of (valid) edges within the mesh.
         %
         % NE = edgeCount(MESH);
         %
@@ -803,7 +878,8 @@ end
 %% Face management methods
 methods
     function nf = faceCount(obj)
-        % Number of faces within the mesh.
+        % Number of (valid) faces within the mesh.
+        %
         % Can be different from the size of the Faces array, as some faces
         % may be marked as invalid.
         %
