@@ -529,6 +529,10 @@ methods
             addEdge(res, [iv1n iv2n]);
         end
     end
+
+    function deg = vertexDegree(obj, vertexIndex)
+        deg = cellfun(@length, obj.VertexEdges(vertexIndex));
+    end
     
     function polyList = vertexLinkPolygons(obj, vertexIndex)
         % Return the 1-link around a vertex as a list of 3D polylines.
