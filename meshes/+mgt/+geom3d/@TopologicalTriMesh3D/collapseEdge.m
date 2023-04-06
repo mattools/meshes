@@ -29,23 +29,16 @@ function collapseEdge(obj, edgeIndex)
 % Copyright 2021 INRAE.
 
 
-%% Retrieve necessary info
+%% check pre-conditions
 
-% list of edges to remove, initializes with edge index.
-edgesToRemove = edgeIndex;
+if ~obj.ValidEdges(edgeIndex)
+    warning('trying to collapse invalid edge #%d', edgeIndex);
+    return;
+end
 
 % index of source and target vertices
 iv1 = obj.Edges(edgeIndex, 1);
 iv2 = obj.Edges(edgeIndex, 2);
-
-% get index of faces adjacent to current edge
-adjFaceInds = obj.EdgeFaces{edgeIndex};
-if length(adjFaceInds) > 2
-    warning('edge %d was adjacent to more than two faces', edgeIndex);
-end
-
-
-%% check pre-conditions
 
 % case of boundary vertices
 if isBoundaryVertex(obj, iv1) && isBoundaryVertex(obj, iv2)
@@ -72,6 +65,15 @@ end
 
 
 %% Iterate over adjacent faces
+
+% list of edges to remove, initializes with edge index.
+edgesToRemove = edgeIndex;
+
+% get index of faces adjacent to current edge
+adjFaceInds = obj.EdgeFaces{edgeIndex};
+if length(adjFaceInds) > 2
+    warning('edge %d was adjacent to more than two faces', edgeIndex);
+end
 
 % for each adjacent face:
 % * remove ref from adjacent vertices

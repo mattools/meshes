@@ -24,7 +24,7 @@ mesh = mgt.geom3d.TopologicalTriMesh3D();
 addVertex(mesh, [0 0 0;12 0 0; 0 12 0]);
 addFace(mesh, [1 2 3]);
 
-centroids = faceCentroid(mesh);
+centroids = coordinates(faceCentroid(mesh));
 
 assertEqual(testCase, size(centroids), [1 3]);
 assertEqual(testCase, centroids, [4 4 0]);
@@ -39,7 +39,7 @@ addFace(mesh, [1 2 3]);
 addFace(mesh, [3 2 4]);
 removeFace(mesh, 1);
 
-centroids = faceCentroid(mesh);
+centroids = coordinates(faceCentroid(mesh));
 
 assertEqual(testCase, size(centroids), [1 3]);
 assertEqual(testCase, centroids, [8 8 0]);

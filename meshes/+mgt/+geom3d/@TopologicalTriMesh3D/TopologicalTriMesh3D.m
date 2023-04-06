@@ -11,12 +11,12 @@ classdef (InferiorClasses = {?matlab.graphics.axis.Axes}) TopologicalTriMesh3D <
 %
 %   Example
 %     % Create and display an octahedron
-%     oct = TopologicalTriMesh3D.createOctahedron;
+%     oct = TopologicalTriMesh3D(Mesh3D.createOctahedron);
 %     figure; hold on; axis equal; view(3)
 %     draw(oct);
 %
 %     % Create and display an octahedron
-%     ico = TopologicalTriMesh3D.createIcosahedron;
+%     ico = TopologicalTriMesh3D(Mesh3D.createIcosahedron);
 %     figure; hold on; axis equal; view(3)
 %     draw(ico);
 %
@@ -72,39 +72,6 @@ properties
     ValidFaces = true([0 1]);
     
 end % end properties
-
-
-% %% Static factories
-% methods (Static)
-%     function obj = createOctahedron()
-%         vertices = [1 0 0;0 1 0;-1 0 0;0 -1 0;0 0 1;0 0 -1];
-%         faces = [1 2 5;2 3 5;3 4 5;4 1 5;1 6 2;2 6 3;3 6 4;1 4 6];
-%         obj = TopologicalTriMesh3D(vertices, faces);
-%     end
-%     
-%     function obj = createIcosahedron()
-%         len = 1/sin(pi/5)/2;
-%         z1 = sqrt(1-len*len);
-%         t1 = (0:2*pi/5:2*pi*(1-1/5))';
-%         x1 = len*cos(t1);  y1 = len*sin(t1);
-%         t2 = t1 + 2*pi/10;
-%         x2 = len*cos(t2); y2 = len*sin(t2);
-%         h = sqrt(len*len-.5*.5);
-%         z2 = sqrt(3/4 - (len-h)*(len-h));
-% 
-%         vertices = [0 0 0;...
-%             [x1 y1 repmat(z1, [5 1])]; ...
-%             [x2 y2 repmat(z1+z2, [5 1])]; ...
-%             0 0 2*z1+z2];
-%         % faces are ordered to have normals pointing outside of the mesh
-%         faces = [...
-%             1 3  2 ; 1 4  3 ; 1  5  4 ;  1  6  5 ;  1 2  6;...
-%             2 3  7 ; 3 4  8 ; 4  5  9 ;  5  6 10 ;  6 2 11;...
-%             7 3  8 ; 8 4  9 ; 9  5 10 ; 10  6 11 ; 11 2  7;...
-%             7 8 12 ; 8 9 12 ; 9 10 12 ; 10 11 12 ; 11 7 12];
-%         obj = TopologicalTriMesh3D(vertices, faces);
-%     end
-% end % end methods
 
 
 %% Constructor
@@ -227,7 +194,7 @@ methods
         %
         %    MESH2 = reverseOrientation(MESH);
         faces2 = obj.Faces(:, [1 3 2]);
-        res = TopologicalTriMesh3D(obj.Vertices, faces2);
+        res = mgt.geom3d.TopologicalTriMesh3D(obj.Vertices, faces2);
     end
 end
 
@@ -434,34 +401,41 @@ methods
         iv1 = obj.Edges(inds,1);
         iv2 = obj.Edges(inds,2);
         lengths = sqrt(sum((obj.Vertices(iv1, :) - obj.Vertices(iv2, :)).^2, 2));
+        reshape(lengths, size(inds));
     end
     
-    function centroids = faceCentroid(obj, varargin)
+    function [centroids, inds] = faceCentroid(obj, varargin)
         % Compute the normals of all faces in the mesh
         
-        if nargin > 1
-            % process specified faces
-            inds = varargin{1};
-        else
-            % process only valid faces
+        % indices of faces to process
+        if isempty(varargin)
             inds = find(obj.ValidFaces);
+        else
+            inds = varargin{1};
         end
         
+        % allocate coordinates for centroid
         nf = length(inds);
         centroids = zeros(nf, 3);
+
         % For triangular meshes, uses accelerated method
         % (taken from https://github.com/alecjacobson/gptoolbox)
         for ff = 1:3
             centroids = centroids + obj.Vertices(obj.Faces(inds,ff),:) / 3.0;
         end
+        centroids = reshape(mgt.geom3d.Point3D(centroids), size(inds));
     end
     
-    function normals = faceNormal(obj)
+    function [normals, inds] = faceNormal(obj, varargin)
         % Compute the normals of faces.
 
-        % process only valid faces
-        inds = obj.ValidFaces;
-        
+        % indices of faces to process
+        if isempty(varargin)
+            inds = find(obj.ValidFaces);
+        else
+            inds = varargin{1};
+        end
+
         % compute vector of first edges
         v1 = obj.Vertices(obj.Faces(inds,1),:);
         v12 = obj.Vertices(obj.Faces(inds,2),:) - v1;
@@ -469,16 +443,17 @@ methods
         
         % compute normals using cross product (vectors have same size)
         normals = cross(v12, v13, 2);
-        %TODO: return Vector3D?
+        normals = reshape(mgt.geom3d.Vector3D(normals), size(inds));
     end
     
-    function normals = vertexNormal(obj)
+    function normals = vertexNormal(obj, varargin)
         % Compute the normals at vertices.
+
         nv = vertexCount(obj);
         nf = faceCount(obj);
         
         % unit normals to the faces
-        fNormals = faceNormals(obj);
+        fNormals = coordinates(faceNormals(obj));
         
         % compute normal of each vertex: sum of normals to each face
         normals = zeros(nv, 3);
@@ -492,17 +467,18 @@ methods
         end
     end
 
-    function centro = edgeCentroid(obj, varargin)
+    function [centro, inds] = edgeCentroid(obj, varargin)
         % Compute centroid of edge.
         
         if isempty(varargin)
-            inds = obj.ValidEdges;
+            inds = find(obj.ValidEdges);
         else
             inds = varargin{1};
         end
         v1 = obj.Vertices(obj.Edges(inds,1), :);
         v2 = obj.Vertices(obj.Edges(inds,2), :);
         centro = (v1 + v2) / 2;
+        centro = reshape(mgt.geom3d.Point3D(centro), size(inds));
     end
 end
 
@@ -723,14 +699,20 @@ methods
         end
     end
 
-    function ind = addVertex(obj, position)
+    function ind = addVertex(obj, coords)
         % Add one or several vertex(ices) from position(s).
         %
         %  addVertex(MESH, [VX VY VZ]);
         %  VIDX = addVertex(MESH, [VX VY VZ]);
         
         % check input validity
-        if ~isnumeric(position) || size(position, 2) ~= 3
+        if isnumeric(coords) && size(coords, 2) == 3
+            % nothing to do
+            dims = [size(coords, 1) 1];
+        elseif isa(coords, 'mgt.geom3d.Point3D')
+            dims = size(coords);
+            coords = coordinates(coords);
+        else
             error('Position must be a numeric array with three columns');
         end
         
@@ -738,14 +720,15 @@ methods
         ind0 = size(obj.Vertices, 1);
         
         % add the new vertex
-        nv = size(position, 1);
-        obj.Vertices = [obj.Vertices ; position];
+        nv = size(coords, 1);
+        obj.Vertices = [obj.Vertices ; coords];
         obj.ValidVertices = [obj.ValidVertices ; true(nv,1)];
         ind = ((ind0+1):size(obj.Vertices, 1))';
 
         % initialize vertex data
         obj.VertexEdges(ind) = cell(nv, 1);
         obj.VertexFaces(ind) = cell(nv, 1);
+        ind = reshape(ind, dims);
     end
     
     function vertexInds = removeInvalidVertices(obj)

@@ -31,12 +31,12 @@ function res = planeIntersection(obj, plane, varargin)
 
 % identify which edges cross the mesh
 % (one vertex is below, the other one is above)
-inds = isBelow(plane, Point3D(obj.Vertices));
+inds = isBelow(plane, mgt.geom3d.Point3D(obj.Vertices));
 crossEdgeInds = find(sum(inds(obj.Edges), 2) == 1);
 crossEdgeVerts = obj.Edges(crossEdgeInds, :);
 
 % compute one intersection point for each edge
-edges = LineSegment3D(obj.Vertices(crossEdgeVerts(:, 1), :), obj.Vertices(crossEdgeVerts(:, 2), :));
+edges = mgt.geom3d.LineSegment3D(obj.Vertices(crossEdgeVerts(:, 1), :), obj.Vertices(crossEdgeVerts(:, 2), :));
 intersectionPoints = planeIntersection(edges, plane);
 
 nCrossEdges = length(crossEdgeInds);
@@ -106,7 +106,7 @@ end
 
 % format output as an array of LinearRing3D objects
 nPolys = length(polys);
-res(nPolys, 1) = LinearRing3D();
+res(nPolys, 1) = mgt.geom3d.LinearRing3D();
 for i = 1:length(polys)
-    res(i) = LinearRing3D(polys{i});
+    res(i) = mgt.geom3d.LinearRing3D(polys{i});
 end

@@ -17,8 +17,8 @@ function h = drawFaceNormals(obj, varargin)
 % Copyright 2021 INRAE.
 
 % compute vector data
-c = faceCentroids(obj);
-n = faceNormals(obj);
+c = faceCentroid(obj);
+n = faceNormal(obj);
 
 % display an arrow for each normal
 hq = quiver3(c(:,1), c(:,2), c(:,3), n(:,1), n(:,2), n(:,3));
