@@ -17,5 +17,5 @@ function neighs = adjacentVertices(obj, vertexIndex)
 % Copyright 2022 INRAE.
 
 
-neighs = unique(obj.Faces(vertexIndex, :));
+neighs = unique(obj.Faces(obj.VertexFaces{vertexIndex}, :));
 neighs(neighs == vertexIndex) = [];

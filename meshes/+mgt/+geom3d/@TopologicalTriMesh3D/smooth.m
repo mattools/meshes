@@ -48,4 +48,4 @@ for k = 1:nIter
 end
 
 % create a new mesh with same faces
-res = TopologicalTriMesh3D(v2, obj.Faces);
+res = mgt.geom3d.TopologicalTriMesh3D(v2, obj.Faces);

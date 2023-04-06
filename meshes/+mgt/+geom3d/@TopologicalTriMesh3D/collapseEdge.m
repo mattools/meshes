@@ -1,5 +1,5 @@
 function collapseEdge(obj, edgeIndex)
-% Collapse the two extremities of the edge, removing adjacent faces.
+% COLLAPSEEDGE Merge the two extremities of the edge, removing adjacent faces.
 %
 %   collapseEdge(MESH, EDGE_IDX);
 %   Collapses the two extremities of the edge specified by index EDGE_IDX,
@@ -8,18 +8,22 @@ function collapseEdge(obj, edgeIndex)
 %   This removes one vertex, three edges, and two faces from the original
 %   mesh.
 %
-%   Two conditions have to be met:
+%   Several conditions have to be met:
+%   * The edge must not have been marker as invalid (i.e. removed during a
+%       former operation)
 %   * If the extremity vertices are boundary vertices, then the edge must
 %       be a boundary edge
 %   * for all vertices incident to both extremity vertices, there must be a
 %       face with the two extremity vertices and the incident vertex. If
 %       not verified, this creates a dupicate fold-over triangle.
+%   If one of the above is not true, an error is raised.
 %
 %   Example
 %   
 %
 %   See also
 %     removeFace
+%
 
 % ------
 % Author: David Legland
@@ -32,8 +36,7 @@ function collapseEdge(obj, edgeIndex)
 %% check pre-conditions
 
 if ~obj.ValidEdges(edgeIndex)
-    warning('trying to collapse invalid edge #%d', edgeIndex);
-    return;
+    error('trying to collapse invalid edge #%d', edgeIndex);
 end
 
 % index of source and target vertices
@@ -49,18 +52,13 @@ end
 
 % check vertices adjacent to both extremities form an existing face
 % we can check only the faces incident to the edge to collapse
-edgeFaceVerts = obj.Faces(obj.EdgeFaces{edgeIndex},:);
 neighs1 = unique(obj.Edges(obj.VertexEdges{iv1},:));
 neighs1(ismember(neighs1, [iv1 iv2])) = [];
 neighs2 = unique(obj.Edges(obj.VertexEdges{iv2},:));
 neighs2(ismember(neighs2, [iv1 iv2])) = [];
 adjBoth = neighs1(ismember(neighs1, neighs2));
-for iAdj = 1:length(adjBoth)
-    ivAdj = adjBoth(iAdj);
-    face = [iv1 iv2 ivAdj];
-    if ~any(sum(ismember(edgeFaceVerts, face), 2) == 3)
-        error('Vertex #%d is adjacent to both extremities of edge #%d, but no face exist with all three vertices.', ivAdj, edgeIndex);
-    end
+if length(adjBoth) > 2
+    error('The one-rings around vertices of edge %d intersect in more than two vertices.', edgeIndex);
 end
 
 
