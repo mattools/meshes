@@ -20,7 +20,7 @@ tests = functiontests(localfunctions);
 function test_Simple(testCase) %#ok<*DEFNU>
 % Test call of function without argument.
 
-mesh = TopologicalTriMesh3D();
+mesh = mgt.geom3d.TopologicalTriMesh3D();
 v1 = addVertex(mesh, [10 20 10]);
 v2 = addVertex(mesh, [30 20 10]);
 vf1 = addVertex(mesh, [20 30 10]);

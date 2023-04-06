@@ -17,10 +17,11 @@ function tests = test_addFace
 
 tests = functiontests(localfunctions);
 
+
 function test_AddSingleFace(testCase) %#ok<*DEFNU>
 % Test call of function without argument.
 
-mesh = TopologicalTriMesh3D();
+mesh = mgt.geom3d.TopologicalTriMesh3D();
 
 addVertex(mesh, [0 0 0]);
 addVertex(mesh, [10 0 0]);
@@ -35,7 +36,7 @@ assertEqual(testCase, edgeCount(mesh), 3);
 function test_Tetrahedron(testCase) %#ok<*DEFNU>
 % Test call of function without argument.
 
-mesh = TopologicalTriMesh3D();
+mesh = mgt.geom3d.TopologicalTriMesh3D();
 
 addVertex(mesh, [0 0 0]);
 addVertex(mesh, [10 0 0]);

@@ -1,4 +1,4 @@
-classdef TopologicalTriMesh3D < handle
+classdef (InferiorClasses = {?matlab.graphics.axis.Axes}) TopologicalTriMesh3D < mgt.geom3d.TriMesh3D
 % A 3D triangular mesh that stores the full topology information.
 %
 %   The TopologicalTriMesh3D class is an implementation of 3D triangular
@@ -7,7 +7,7 @@ classdef TopologicalTriMesh3D < handle
 %   a vertex, which faces are incident to an edge, and so on...
 %   It will be possible to remove elements from the mesh.
 %
-%   Requires the "Geometry" package.
+%   Requires the "magnetik" package.
 %
 %   Example
 %     % Create and display an octahedron
@@ -73,37 +73,38 @@ properties
     
 end % end properties
 
-%% Static factories
-methods (Static)
-    function obj = createOctahedron()
-        vertices = [1 0 0;0 1 0;-1 0 0;0 -1 0;0 0 1;0 0 -1];
-        faces = [1 2 5;2 3 5;3 4 5;4 1 5;1 6 2;2 6 3;3 6 4;1 4 6];
-        obj = TopologicalTriMesh3D(vertices, faces);
-    end
-    
-    function obj = createIcosahedron()
-        len = 1/sin(pi/5)/2;
-        z1 = sqrt(1-len*len);
-        t1 = (0:2*pi/5:2*pi*(1-1/5))';
-        x1 = len*cos(t1);  y1 = len*sin(t1);
-        t2 = t1 + 2*pi/10;
-        x2 = len*cos(t2); y2 = len*sin(t2);
-        h = sqrt(len*len-.5*.5);
-        z2 = sqrt(3/4 - (len-h)*(len-h));
 
-        vertices = [0 0 0;...
-            [x1 y1 repmat(z1, [5 1])]; ...
-            [x2 y2 repmat(z1+z2, [5 1])]; ...
-            0 0 2*z1+z2];
-        % faces are ordered to have normals pointing outside of the mesh
-        faces = [...
-            1 3  2 ; 1 4  3 ; 1  5  4 ;  1  6  5 ;  1 2  6;...
-            2 3  7 ; 3 4  8 ; 4  5  9 ;  5  6 10 ;  6 2 11;...
-            7 3  8 ; 8 4  9 ; 9  5 10 ; 10  6 11 ; 11 2  7;...
-            7 8 12 ; 8 9 12 ; 9 10 12 ; 10 11 12 ; 11 7 12];
-        obj = TopologicalTriMesh3D(vertices, faces);
-    end
-end % end methods
+% %% Static factories
+% methods (Static)
+%     function obj = createOctahedron()
+%         vertices = [1 0 0;0 1 0;-1 0 0;0 -1 0;0 0 1;0 0 -1];
+%         faces = [1 2 5;2 3 5;3 4 5;4 1 5;1 6 2;2 6 3;3 6 4;1 4 6];
+%         obj = TopologicalTriMesh3D(vertices, faces);
+%     end
+%     
+%     function obj = createIcosahedron()
+%         len = 1/sin(pi/5)/2;
+%         z1 = sqrt(1-len*len);
+%         t1 = (0:2*pi/5:2*pi*(1-1/5))';
+%         x1 = len*cos(t1);  y1 = len*sin(t1);
+%         t2 = t1 + 2*pi/10;
+%         x2 = len*cos(t2); y2 = len*sin(t2);
+%         h = sqrt(len*len-.5*.5);
+%         z2 = sqrt(3/4 - (len-h)*(len-h));
+% 
+%         vertices = [0 0 0;...
+%             [x1 y1 repmat(z1, [5 1])]; ...
+%             [x2 y2 repmat(z1+z2, [5 1])]; ...
+%             0 0 2*z1+z2];
+%         % faces are ordered to have normals pointing outside of the mesh
+%         faces = [...
+%             1 3  2 ; 1 4  3 ; 1  5  4 ;  1  6  5 ;  1 2  6;...
+%             2 3  7 ; 3 4  8 ; 4  5  9 ;  5  6 10 ;  6 2 11;...
+%             7 3  8 ; 8 4  9 ; 9  5 10 ; 10  6 11 ; 11 2  7;...
+%             7 8 12 ; 8 9 12 ; 9 10 12 ; 10 11 12 ; 11 7 12];
+%         obj = TopologicalTriMesh3D(vertices, faces);
+%     end
+% end % end methods
 
 
 %% Constructor
@@ -114,8 +115,8 @@ methods
         if nargin == 0
             % empty constructor -> nothing to do
             
-        elseif nargin == 1 && isa(varargin{1}, 'TriMesh3D')
-            % convert TriMesh to topological mesh
+        elseif nargin == 1 && isa(varargin{1}, 'mgt.geom3d.TriMesh3D')
+            % convert geenric TriMesh to topological mesh
             var1 = varargin{1};
             initializeVertices(obj, var1.Vertices);
             initializeFaces(obj, var1.Faces);
@@ -414,7 +415,7 @@ methods
         vertices = obj.Vertices(obj.ValidVertices, :);
         mini = min(vertices);
         maxi = max(vertices);
-        box = Bounds3D([mini(1) maxi(1) mini(2) maxi(2) mini(3) maxi(3)]);
+        box = mgt.geom3d.Bounds3D([mini(1) maxi(1) mini(2) maxi(2) mini(3) maxi(3)]);
     end
     
     function [lengths, inds] = edgeLength(obj, varargin)
@@ -533,7 +534,7 @@ methods
         newEdgeInds = unique(newEdgeInds);
         
         % create the resulting mesh
-        res = TopologicalTriMesh3D();
+        res = mgt.geom3d.TopologicalTriMesh3D();
         % add each vertex, keeping the mapping of old vertex indices to new
         % vertex indices 
         vertexIndsMap = containers.Map('KeyType', 'int32', 'ValueType', 'int32');
@@ -695,7 +696,7 @@ methods
         end
         
         % create new mesh
-        res = TopologicalTriMesh3D(obj.Vertices(inds, :), faces2);
+        res = mgt.geom3d.TopologicalTriMesh3D(obj.Vertices(inds, :), faces2);
     end
 end
 
@@ -713,6 +714,15 @@ methods
         nv = sum(obj.ValidVertices);
     end
     
+    function coords = vertexCoordinates(obj, varargin)
+        % Return coordinates of mesh vertices as numeric array.
+        if isempty(varargin)
+            coords = obj.Vertices(obj.ValidVertices, :);
+        else
+            coords = obj.Vertices(varargin{1}, :);
+        end
+    end
+
     function ind = addVertex(obj, position)
         % Add one or several vertex(ices) from position(s).
         %
@@ -892,6 +902,14 @@ methods
         nf = sum(obj.ValidFaces);
     end
     
+    function inds = faceVertexIndices(obj, varargin)
+        if isempty(varargin)
+            inds = obj.Faces(obj.ValidFaces, :);
+        else
+            inds = obj.Faces(varargin{1}, :);
+        end
+    end
+    
     function indFace = addFace(obj, vertexInds)
         % Add a face given 3 vertex indices and return new face index.
         %
@@ -1020,45 +1038,45 @@ methods
     function res = scale(obj, varargin)
         % Returns a scaled version of this geometry.
         factor = varargin{1};
-        res = TopologicalTriMesh3D(obj.Vertices * factor, obj.Faces);
+        res = mgt.geom3d.TopologicalTriMesh3D(obj.Vertices * factor, obj.Faces);
     end
     
     function res = translate(obj, varargin)
         % Returns a translated version of this geometry.
         shift = varargin{1};
-        res = TopologicalTriMesh3D(bsxfun(@plus, obj.Vertices, shift), obj.Faces);
+        res = mgt.geom3d.TopologicalTriMesh3D(bsxfun(@plus, obj.Vertices, shift), obj.Faces);
     end
     
 end % end methods
 
-%% Overload Matlab functions 
-methods
-    function dims = size(obj, varargin)
-        % Override the size function to return number of mesh elements.
-        %
-        % S = size(MESH)
-        % Returns a vector row with the number of vertices, of edges, and
-        % of faces.
-        %
-        % S = size(MESH, I)
-        % Returns the number of elements according to I, that can be 1, 2
-        % or 3.
-        %
-        if isempty(varargin)
-            dims = [vertexCount(obj) edgeCount(obj) faceCount(obj)];
-        else
-            nd = varargin{1};
-            if nd == 1
-                dims = vertexCount(obj);
-            elseif nd == 2
-                dims = edgeCount(obj);
-            elseif nd == 3
-                dims = faceCount(obj);
-            else
-                error('Dimension argument must be between 1 and 3');
-            end
-        end
-    end
-end
+% %% Overload Matlab functions 
+% methods
+%     function dims = size(obj, varargin)
+%         % Override the size function to return number of mesh elements.
+%         %
+%         % S = size(MESH)
+%         % Returns a vector row with the number of vertices, of edges, and
+%         % of faces.
+%         %
+%         % S = size(MESH, I)
+%         % Returns the number of elements according to I, that can be 1, 2
+%         % or 3.
+%         %
+%         if isempty(varargin)
+%             dims = [vertexCount(obj) edgeCount(obj) faceCount(obj)];
+%         else
+%             nd = varargin{1};
+%             if nd == 1
+%                 dims = vertexCount(obj);
+%             elseif nd == 2
+%                 dims = edgeCount(obj);
+%             elseif nd == 3
+%                 dims = faceCount(obj);
+%             else
+%                 error('Dimension argument must be between 1 and 3');
+%             end
+%         end
+%     end
+% end
 
 end % end classdef

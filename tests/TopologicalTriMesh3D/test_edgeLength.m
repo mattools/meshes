@@ -20,7 +20,7 @@ tests = functiontests(localfunctions);
 function test_AllEdges(testCase) %#ok<*DEFNU>
 % Test call of function without argument.
 
-mesh = TopologicalTriMesh3D();
+mesh = mgt.geom3d.TopologicalTriMesh3D();
 addVertex(mesh, [0 0 0]);
 addVertex(mesh, [10 0 0]);
 addVertex(mesh, [0 10 0]);
@@ -37,7 +37,7 @@ assertEqual(testCase, els, [10 10 10*sqrt(2)]');
 function test_ChooseEdges(testCase) %#ok<*DEFNU>
 % Test call of function without argument.
 
-mesh = TopologicalTriMesh3D();
+mesh = mgt.geom3d.TopologicalTriMesh3D();
 addVertex(mesh, [0 0 0]);
 addVertex(mesh, [10 0 0]);
 addVertex(mesh, [0 10 0]);
